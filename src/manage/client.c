@@ -4493,9 +4493,13 @@ void client_check_tab_node_visible(Client *c) {
 
 	Client *cur = client_group_head(c);
 	while (cur) {
+		/* A window sliding out with its workspace keeps its tabs until it
+		 * is gone: they slide out with it, as Hyprland's group bar. */
+		bool on_view = TAGMATCH(c, c->mon) ||
+					   (c->animation.running && c->animation.tagouting);
 		bool show = !c->mon->isoverview && cur->group_bar &&
-					client_wants_group_bar(cur) && TAGMATCH(c, c->mon) &&
-					ISNORMAL(c) && !c->isfullscreen;
+					client_wants_group_bar(cur) && on_view && ISNORMAL(c) &&
+					!c->isfullscreen;
 		if (!cur->group_bar) {
 			cur = cur->group_next;
 			continue;
