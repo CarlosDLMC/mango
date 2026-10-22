@@ -93,6 +93,30 @@ bool parse_option(Config *config, char *key, char *value, int line_number) {
 		config->animation_duration_tag = atoi(value);
 	} else if (strcmp(key, "animation_duration_close") == 0) {
 		config->animation_duration_close = atoi(value);
+	} else if (strcmp(key, "animation_duration_layer_open") == 0) {
+		config->animation_duration_layer_open = atoi(value);
+	} else if (strcmp(key, "animation_duration_layer_close") == 0) {
+		config->animation_duration_layer_close = atoi(value);
+	} else if (strcmp(key, "animation_curve_layer_fade_in") == 0) {
+		if (parse_double_array(value, config->animation_curve_layer_fade_in,
+							   4) != 4) {
+			mango_error(false, WLR_ERROR,
+						"Failed to parse animation_curve_layer_fade_in: "
+						"\033[1m\033[31m%s\033[0m\n",
+						value);
+			return false;
+		}
+		config->layer_fade_in_curve_set = true;
+	} else if (strcmp(key, "animation_curve_layer_fade_out") == 0) {
+		if (parse_double_array(value, config->animation_curve_layer_fade_out,
+							   4) != 4) {
+			mango_error(false, WLR_ERROR,
+						"Failed to parse animation_curve_layer_fade_out: "
+						"\033[1m\033[31m%s\033[0m\n",
+						value);
+			return false;
+		}
+		config->layer_fade_out_curve_set = true;
 	} else if (strcmp(key, "animation_duration_focus") == 0) {
 		config->animation_duration_focus = atoi(value);
 	} else if (strcmp(key, "animation_curve_move") == 0) {
@@ -2395,6 +2419,10 @@ void set_value_default() {
 	config.animation_duration_open = 400;
 	config.animation_duration_tag = 300;
 	config.animation_duration_close = 300;
+	config.animation_duration_layer_open = -1;
+	config.animation_duration_layer_close = -1;
+	config.layer_fade_in_curve_set = false;
+	config.layer_fade_out_curve_set = false;
 	config.animation_duration_focus = 0;
 
 	config.axis_bind_apply_timeout = 100;
@@ -2753,6 +2781,10 @@ void override_config(void) {
 		CLAMP_INT(config.animation_duration_tag, 0, 50000);
 	config.animation_duration_close =
 		CLAMP_INT(config.animation_duration_close, 0, 50000);
+	config.animation_duration_layer_open =
+		CLAMP_INT(config.animation_duration_layer_open, -1, 50000);
+	config.animation_duration_layer_close =
+		CLAMP_INT(config.animation_duration_layer_close, -1, 50000);
 	config.animation_duration_focus =
 		CLAMP_INT(config.animation_duration_focus, 0, 50000);
 	config.scroller_default_proportion =

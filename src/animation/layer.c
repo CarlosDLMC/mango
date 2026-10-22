@@ -352,7 +352,7 @@ void fadeout_layer_animation_next_tick(LayerSurface *l) {
 	};
 
 	double opacity_eased_progress =
-		find_animation_curve_at(animation_passed, OPAFADEOUT);
+		find_animation_curve_at(animation_passed, LAYERFADEOUT);
 
 	double percent = config.fadeout_begin_opacity -
 					 (opacity_eased_progress * config.fadeout_begin_opacity);
@@ -450,7 +450,7 @@ void layer_animation_next_tick(LayerSurface *l) {
 				(l->current.y - l->animation.initial.y) * factor;
 
 	double opacity_eased_progress =
-		find_animation_curve_at(animation_passed, OPAFADEIN);
+		find_animation_curve_at(animation_passed, LAYERFADEIN);
 
 	double opacity = MANGO_MIN(config.fadein_begin_opacity +
 								   opacity_eased_progress *
@@ -542,7 +542,10 @@ void init_fadeout_layers(LayerSurface *l) {
 		return;
 	}
 
-	fadeout_layer->animation.duration = config.animation_duration_close;
+	fadeout_layer->animation.duration =
+		config.animation_duration_layer_close >= 0
+			? config.animation_duration_layer_close
+			: config.animation_duration_close;
 	fadeout_layer->geom = fadeout_layer->current =
 		fadeout_layer->animainit_geom = fadeout_layer->animation.initial =
 			l->animation.current;
