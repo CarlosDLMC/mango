@@ -188,10 +188,12 @@ int32_t keyboard_repeat(void *data) {
 	wl_event_source_timer_update(group->key_repeat_source,
 								 1000 / group->keyboard->repeat_info.rate);
 
+	server.key_repeating = true;
 	for (i = 0; i < group->nsyms; i++)
 		keyboard_check_keybinding(WL_KEYBOARD_KEY_STATE_PRESSED, false,
 								  group->mods, group->keysyms[i],
 								  group->keycode);
+	server.key_repeating = false;
 
 	return 0;
 }
@@ -641,6 +643,13 @@ int32_t keyboard_check_keybinding(uint32_t state, bool is_locked, uint32_t mods,
 			} else {
 				handled = 0;
 			}
+
+			/* bind_repeat_flagged_only: a held key runs its bind once, as
+			 * Hyprland's bind; only binde repeats. The repeat is still
+			 * swallowed, so it does not reach the focused window. */
+			if (server.key_repeating && config.bind_repeat_flagged_only &&
+				!k->isrepeatapply)
+				break;
 
 			if (k->func(&k->arg))
 				break;

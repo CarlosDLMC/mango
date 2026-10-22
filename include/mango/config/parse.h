@@ -101,6 +101,7 @@ typedef struct {
 	bool isreleaseapply;
 	bool ispassapply;
 	bool isallowconflict;
+	bool isrepeatapply; /* binde: runs again while its key is held */
 	int line_number;
 	int file_index;
 } KeyBinding;
@@ -314,6 +315,7 @@ typedef struct {
 	int32_t layer_animation_type_close;
 	int32_t animation_fade_in;
 	int32_t animation_native_content;
+	int32_t bind_repeat_flagged_only;
 	int32_t animation_fade_out;
 	int32_t tag_animation_direction;
 	float zoom_initial_ratio;
