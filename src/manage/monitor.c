@@ -150,7 +150,28 @@ bool is_overcircle_mode(const Monitor *m) {
 		   !m->ov_normal_mode;
 }
 
+/*
+ * fadeout_below_top: closing windows fade out under the top layer (the bar,
+ * launchers, notifications) instead of over everything, as Hyprland draws a
+ * closing window in its own layer. The special workspace lifts the top layer
+ * above itself, and the fade-out layer goes along.
+ */
+static bool fadeout_special_active;
+void fadeout_layer_sync(void) {
+	struct wlr_scene_node *node = &server.layers_wrap[LyrFadeOut]->node;
+	if (!config.fadeout_below_top)
+		wlr_scene_node_place_below(
+			node, &server.layers_wrap[LyrSpecialOverlay]->node);
+	else if (fadeout_special_active)
+		wlr_scene_node_place_below(node,
+								   &server.layers_wrap[LyrSpecialTop]->node);
+	else
+		wlr_scene_node_place_below(node, &server.layers_wrap[LyrTop]->node);
+}
+
 void special_sync_top_layer(bool special_active) {
+	fadeout_special_active = special_active;
+	fadeout_layer_sync();
 	if (special_active) {
 		wlr_scene_node_reparent(&server.layers[LyrTop]->node,
 								server.layers_wrap[LyrSpecialTop]);
