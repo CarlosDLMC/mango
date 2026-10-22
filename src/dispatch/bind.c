@@ -2419,6 +2419,27 @@ int32_t zoom(const Arg *arg) {
 	return 0;
 }
 
+/* Desktop zoom around the cursor, as Hyprland's cursor:zoom_factor: the
+ * focused monitor's factor times arg->f, kept within 1..10, animated. */
+int32_t zoom_by(const Arg *arg) {
+	Monitor *m = server.selected_monitor;
+	if (!m || arg->f <= 0.0f)
+		return 0;
+	if (m->zoom_target < 1.0)
+		m->zoom_target = 1.0;
+	if (m->zoom_current < 1.0)
+		m->zoom_current = 1.0;
+	double target = m->zoom_target * arg->f;
+	target = target < 1.0 ? 1.0 : target > 10.0 ? 10.0 : target;
+	if (target == m->zoom_target)
+		return 0;
+	m->zoom_from = m->zoom_current;
+	m->zoom_target = target;
+	m->zoom_time_started = get_now_in_ms();
+	wlr_output_schedule_frame(m->wlr_output);
+	return 0;
+}
+
 /* Hides the cursor now, until the pointer moves (a screensaver starting). */
 int32_t hide_cursor(const Arg *arg) {
 	(void)arg;

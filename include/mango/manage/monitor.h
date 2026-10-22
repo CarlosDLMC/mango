@@ -93,6 +93,14 @@ struct Monitor {
 	struct wlr_color_transform
 		*icc_transform; /* ICC transform loaded from the ICC file. */
 	char icc_path[PATH_MAX];
+	/* Desktop zoom around the cursor (zoom_by): the factor now, where it
+	 * animates from and to, and whether the cursor is drawn in software (so
+	 * it is magnified with the frame). */
+	double zoom_current;
+	double zoom_from;
+	double zoom_target;
+	uint32_t zoom_time_started;
+	bool zoom_cursor_locked;
 };
 
 struct Pertag {
@@ -124,6 +132,7 @@ bool is_overcircle_mode(const Monitor *m);
 void special_update_dim(Monitor *m);
 void special_sync_top_layer(bool special_active);
 void fadeout_layer_sync(void);
+bool monitor_zoom_step(Monitor *m);
 uint32_t get_tag_status(uint32_t tag, Monitor *m);
 uint32_t get_tags_first_tag_num(uint32_t source_tags);
 uint32_t get_tags_first_tag(uint32_t source_tags);

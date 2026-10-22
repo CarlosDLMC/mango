@@ -23,6 +23,9 @@
 #include "mango/manage/title-message-bar.h"
 #include "mango/manage/xwayland_primary.h"
 #include <fcntl.h>
+#include <wlr/render/swapchain.h>
+#include <wlr/render/wlr_renderer.h>
+#include <wlr/types/wlr_damage_ring.h>
 #include <scenefx/render/fx_renderer/fx_renderer.h>
 #include <scenefx/types/wlr_scene.h>
 #include <unistd.h>
@@ -381,6 +384,123 @@ bool blur_layer_on_wallpaper(uint32_t layer) {
 	}
 }
 
+/* y of the CSS cubic-bezier (x1, y1, x2, y2) at x. */
+static double zoom_curve_at(double x) {
+	const double *p = config.animation_curve_zoom;
+	double lo = 0.0, hi = 1.0, t = x;
+	for (int32_t i = 0; i < 40; i++) {
+		t = (lo + hi) / 2;
+		double bx = 3 * t * (1 - t) * (1 - t) * p[0] +
+					3 * t * t * (1 - t) * p[2] + t * t * t;
+		if (bx < x)
+			lo = t;
+		else
+			hi = t;
+	}
+	return 3 * t * (1 - t) * (1 - t) * p[1] + 3 * t * t * (1 - t) * p[3] +
+		   t * t * t;
+}
+
+/*
+ * Advances the monitor's zoom animation. While zoomed, the scene renders the
+ * whole frame each time (the magnifying pass reads all of it, and the
+ * swapchain buffers it hands out hold magnified frames), and the cursor is
+ * drawn in software so it is magnified too. Returns whether another frame is
+ * needed for the animation.
+ */
+bool monitor_zoom_step(Monitor *m) {
+	if (m->zoom_target < 1.0)
+		m->zoom_target = 1.0;
+	if (m->zoom_current < 1.0)
+		m->zoom_current = 1.0;
+
+	bool animating = m->zoom_current != m->zoom_target;
+	bool was_zoomed = m->zoom_current > 1.0;
+	if (animating) {
+		uint32_t passed = get_now_in_ms() - m->zoom_time_started;
+		double t = config.animation_duration_zoom > 0
+					   ? (double)passed / config.animation_duration_zoom
+					   : 1.0;
+		if (t >= 1.0) {
+			m->zoom_current = m->zoom_target;
+			animating = false;
+		} else {
+			m->zoom_current = m->zoom_from + (m->zoom_target - m->zoom_from) *
+												 zoom_curve_at(t);
+		}
+	}
+
+	bool zoomed = m->zoom_current > 1.0;
+	if (zoomed != m->zoom_cursor_locked) {
+		wlr_output_lock_software_cursors(m->wlr_output, zoomed);
+		m->zoom_cursor_locked = zoomed;
+	}
+	if (zoomed || was_zoomed)
+		wlr_damage_ring_add_whole(&m->scene_output->damage_ring);
+	return animating;
+}
+
+/* Replaces the frame in state with the part of it around the cursor,
+ * magnified m->zoom_current times: the point under the cursor stays put, and
+ * the region is kept on the output (Hyprland's zoom, zoom_rigid off). */
+static void monitor_zoom_apply(Monitor *m, struct wlr_output_state *state) {
+	struct wlr_output *output = m->wlr_output;
+	if (!(state->committed & WLR_OUTPUT_STATE_BUFFER) || !state->buffer ||
+		!output->swapchain || output->transform != WL_OUTPUT_TRANSFORM_NORMAL)
+		return;
+
+	double f = m->zoom_current;
+	double w = state->buffer->width, h = state->buffer->height;
+	double cx = (server.cursor->x - m->m.x) * output->scale;
+	double cy = (server.cursor->y - m->m.y) * output->scale;
+	cx = cx < 0 ? 0 : cx > w ? w : cx;
+	cy = cy < 0 ? 0 : cy > h ? h : cy;
+	struct wlr_fbox src = {
+		.x = cx - cx / f,
+		.y = cy - cy / f,
+		.width = w / f,
+		.height = h / f,
+	};
+	src.x = src.x < 0 ? 0 : src.x > w - src.width ? w - src.width : src.x;
+	src.y = src.y < 0 ? 0 : src.y > h - src.height ? h - src.height : src.y;
+
+	struct wlr_texture *texture =
+		wlr_texture_from_buffer(server.renderer, state->buffer);
+	if (!texture)
+		return;
+	struct wlr_buffer *dst = wlr_swapchain_acquire(output->swapchain);
+	if (!dst) {
+		wlr_texture_destroy(texture);
+		return;
+	}
+	struct wlr_render_pass *pass =
+		wlr_renderer_begin_buffer_pass(server.renderer, dst, NULL);
+	if (!pass) {
+		wlr_buffer_unlock(dst);
+		wlr_texture_destroy(texture);
+		return;
+	}
+	wlr_render_pass_add_texture(
+		pass, &(struct wlr_render_texture_options){
+				  .texture = texture,
+				  .src_box = src,
+				  .dst_box = {.width = (int32_t)w, .height = (int32_t)h},
+				  .filter_mode = WLR_SCALE_FILTER_BILINEAR,
+			  });
+	bool ok = wlr_render_pass_submit(pass);
+	wlr_texture_destroy(texture);
+	if (!ok) {
+		wlr_buffer_unlock(dst);
+		return;
+	}
+	wlr_output_state_set_buffer(state, dst);
+	wlr_buffer_unlock(dst);
+	pixman_region32_t damage;
+	pixman_region32_init_rect(&damage, 0, 0, (int32_t)w, (int32_t)h);
+	wlr_output_state_set_damage(state, &damage);
+	pixman_region32_fini(&damage);
+}
+
 bool mango_scene_output_commit(struct wlr_scene_output *scene_output,
 							   struct wlr_output_state *state) {
 	struct wlr_output *wlr_output = scene_output->output;
@@ -412,6 +532,9 @@ bool mango_scene_output_commit(struct wlr_scene_output *scene_output,
 		opts.color_transform = m->icc_transform;
 	if (!wlr_scene_output_build_state(scene_output, state, &opts))
 		return false;
+
+	if (m->zoom_current > 1.0)
+		monitor_zoom_apply(m, state);
 
 	if (frame_allow_tearing) {
 		state->tearing_page_flip = true;
@@ -1394,6 +1517,7 @@ void handle_output_frame(struct wl_listener *listener, void *data) {
 		monitor_stop_skip_frame_timer(m);
 	}
 
+	need_more_frames = monitor_zoom_step(m) || need_more_frames;
 	mango_scene_output_commit(m->scene_output, &m->pending);
 
 skip:

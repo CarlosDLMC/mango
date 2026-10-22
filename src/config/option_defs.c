@@ -85,6 +85,16 @@ bool parse_option(Config *config, char *key, char *value, int line_number) {
 		config->fadeout_below_top = atoi(value);
 	} else if (strcmp(key, "special_slide_fade") == 0) {
 		config->special_slide_fade = atoi(value);
+	} else if (strcmp(key, "animation_duration_zoom") == 0) {
+		config->animation_duration_zoom = atoi(value);
+	} else if (strcmp(key, "animation_curve_zoom") == 0) {
+		if (parse_double_array(value, config->animation_curve_zoom, 4) != 4) {
+			mango_error(false, WLR_ERROR,
+						"Failed to parse animation_curve_zoom: "
+						"\033[1m\033[31m%s\033[0m\n",
+						value);
+			return false;
+		}
 	} else if (strcmp(key, "animation_fade_out") == 0) {
 		config->animation_fade_out = atoi(value);
 	} else if (strcmp(key, "tag_animation_direction") == 0) {
@@ -2445,6 +2455,13 @@ void set_value_default() {
 	config.group_focus_wrap = 0;
 	config.fadeout_below_top = 0;
 	config.special_slide_fade = 0;
+	/* Hyprland's zoomFactor animation unconfigured: global, 800 ms, its
+	 * "default" curve. */
+	config.animation_duration_zoom = 800;
+	config.animation_curve_zoom[0] = 0.0;
+	config.animation_curve_zoom[1] = 0.75;
+	config.animation_curve_zoom[2] = 0.15;
+	config.animation_curve_zoom[3] = 1.0;
 	config.animation_fade_out = 1;
 	config.tag_animation_direction = HORIZONTAL;
 	config.zoom_initial_ratio = 0.4f;
@@ -2810,6 +2827,8 @@ void override_config(void) {
 	config.group_focus_wrap = CLAMP_INT(config.group_focus_wrap, 0, 1);
 	config.fadeout_below_top = CLAMP_INT(config.fadeout_below_top, 0, 1);
 	config.special_slide_fade = CLAMP_INT(config.special_slide_fade, 0, 1);
+	config.animation_duration_zoom =
+		CLAMP_INT(config.animation_duration_zoom, 0, 50000);
 	config.animation_fade_out = CLAMP_INT(config.animation_fade_out, 0, 1);
 	config.zoom_initial_ratio =
 		CLAMP_FLOAT(config.zoom_initial_ratio, 0.1f, 1.0f);
