@@ -519,14 +519,14 @@ void client_draw_group_bar(Client *c, struct ivec2 offsets) {
 		th = th - GEZERO(bottom_over - c->animation.current.height);
 	}
 
-	if (right_over > 0)
-		tw = tw - right_over;
-	if (left_over > 0) {
-		tab_x = c->mon->m.x;
-		tw = tw - left_over;
-	}
+	/* The tabs keep their places on the whole window and move with it (a
+	 * workspace slide); what is past the monitor's edge is clipped, as the
+	 * window is. Shrinking the strip to the visible part made the tabs
+	 * squeeze and slide on their own. */
+	int32_t vis_l = tab_x + GEZERO(left_over);
+	int32_t vis_r = tab_x + tw - GEZERO(right_over);
 
-	if (tw <= 0 || th <= 0) {
+	if (tw <= 0 || th <= 0 || vis_r <= vis_l) {
 		cur = client_group_head(c);
 		while (cur) {
 			if (cur->group_bar)
@@ -551,6 +551,10 @@ void client_draw_group_bar(Client *c, struct ivec2 offsets) {
 	for (int i = 0; i < count && cur; i++) {
 		int32_t w = bar_w + (i < rem ? 1 : 0);
 		global_draw_group_bar(cur, x, tab_y, w, th);
+		if (cur->group_bar)
+			mango_bar_decoration_set_hclip(cur->group_bar,
+										   GEZERO(vis_l - x),
+										   GEZERO(x + w - vis_r));
 		x += w + gap;
 		cur = cur->group_next;
 	}
