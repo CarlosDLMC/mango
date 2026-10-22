@@ -631,6 +631,8 @@ FuncType parse_func_name(char *func_name, Arg *arg, char *arg_value,
 		}
 	} else if (strcmp(func_name, "toggle_trackpad_enable") == 0) {
 		func = toggle_trackpad_enable;
+	} else if (strcmp(func_name, "hide_cursor") == 0) {
+		func = hide_cursor;
 	} else if (strcmp(func_name, "setoption") == 0) {
 		func = setoption;
 
