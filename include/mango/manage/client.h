@@ -234,6 +234,8 @@ struct Client {
 	/* group_auto_join: the group window that had the focus when this one
 	 * mapped; it joins that group once its rules are applied. */
 	Client *group_join_target;
+	/* special_slide_fade: 1 fading in, -1 fading out with the slide. */
+	int32_t special_fade;
 
 	/* auto tab chain; state kept fully separate from group */
 	MangoBarDecoration *tab_bar;

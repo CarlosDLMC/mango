@@ -1830,6 +1830,29 @@ void client_set_focused_opacity_animation(Client *c) {
 }
 
 bool client_apply_focus_opacity(Client *c) {
+	/* special_slide_fade: the window fades with its special workspace slide,
+	 * on the slide's curve. */
+	if (c->special_fade) {
+		float base =
+			(server.selected_monitor && c == server.selected_monitor->sel)
+				? c->focused_opacity
+				: c->unfocused_opacity;
+		if (c->animation.running &&
+			(c->animation.tagining || c->animation.tagouting)) {
+			struct timespec now;
+			clock_gettime(CLOCK_MONOTONIC, &now);
+			int32_t passed = timespec_to_ms(&now) - c->animation.time_started;
+			double linear = c->animation.duration
+								? (double)passed / (double)c->animation.duration
+								: 1.0;
+			double eased = find_animation_curve_at(MANGO_MIN(linear, 1.0), TAG);
+			double alpha = c->special_fade > 0 ? eased : 1.0 - eased;
+			client_set_opacity(c, base * alpha);
+			return true;
+		}
+		c->special_fade = 0;
+		client_set_opacity(c, base);
+	}
 	if (config.blur && !c->no_blur && c->blur_opacity != 1.0f &&
 		c->animation.action != OPEN) {
 		c->blur_opacity = 1.0f;
