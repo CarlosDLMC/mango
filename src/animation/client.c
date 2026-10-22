@@ -227,20 +227,74 @@ void set_client_open_animation(Client *c, struct wlr_box geo) {
 	}
 }
 
+/*
+ * animation_native_content, for a window's main surface: drawn at its native
+ * size, never scaled. wlroots shows the clip box (the part of the surface the
+ * animated box covers) through the buffer's source box, cut at the buffer's
+ * edge. Here the source box is the whole clip box: where the animated box is
+ * bigger than the surface (a shrinking window that has already drawn its new,
+ * smaller frame) it reaches past the buffer, and the renderer's clamp-to-edge
+ * sampling repeats the edge pixels into the rest - Hyprland's
+ * render:expand_undersized_textures. Returns false for buffers it leaves to the
+ * scaling path (subsurfaces, popups, viewported or transformed surfaces).
+ */
+static bool scene_buffer_apply_native(struct wlr_scene_buffer *buffer,
+									  BufferData *buffer_data) {
+	struct wlr_scene_surface *scene_surface =
+		wlr_scene_surface_try_from_buffer(buffer);
+	if (scene_surface == NULL || buffer->buffer == NULL)
+		return false;
+
+	struct wlr_surface *surface = scene_surface->surface;
+	struct wlr_surface_state *state = &surface->current;
+	if (wlr_xdg_toplevel_try_from_wlr_surface(surface) == NULL ||
+		state->transform != WL_OUTPUT_TRANSFORM_NORMAL)
+		return false;
+
+	if (state->width <= 0 || state->height <= 0 || buffer_data->width <= 0 ||
+		buffer_data->height <= 0)
+		return false;
+
+	/* The buffer area behind the whole surface (a viewport may pick part of
+	 * the buffer), then the clip box as a part of it, as wlroots does. */
+	struct wlr_fbox full;
+	wlr_surface_get_buffer_source_box(surface, &full);
+	double sx = full.width / state->width;
+	double sy = full.height / state->height;
+	struct wlr_fbox src = {
+		.x = full.x + buffer_data->clip_x * sx,
+		.y = full.y + buffer_data->clip_y * sy,
+		.width = buffer_data->width * sx,
+		.height = buffer_data->height * sy,
+	};
+	wlr_scene_buffer_set_source_box(buffer, &src);
+	wlr_scene_buffer_set_dest_size(buffer, buffer_data->width,
+								   buffer_data->height);
+	wlr_scene_buffer_set_corner_radii(buffer, buffer_data->corner_location);
+	return true;
+}
+
 void scene_buffer_apply_effect(struct wlr_scene_buffer *buffer, int32_t sx,
 							   int32_t sy, void *data) {
 	BufferData *buffer_data = (BufferData *)data;
 
-	if (buffer_data->should_scale && buffer_data->height_scale < 1 &&
+	if (buffer_data->native) {
+		if (scene_buffer_apply_native(buffer, buffer_data))
+			return;
+		buffer_data->should_scale = false;
+	}
+
+	if (!buffer_data->fit && buffer_data->should_scale &&
+		buffer_data->height_scale < 1 &&
 		buffer_data->width_scale < 1)
 		buffer_data->should_scale = false;
 
-	if (buffer_data->should_scale && buffer_data->height_scale == 1 &&
-		buffer_data->width_scale < 1)
+	if (!buffer_data->fit && buffer_data->should_scale &&
+		buffer_data->height_scale == 1 && buffer_data->width_scale < 1)
 		buffer_data->should_scale = false;
 
-	if (buffer_data->should_scale && buffer_data->height_scale < 1 &&
-		buffer_data->width_scale == 1)
+	if (!buffer_data->fit && buffer_data->should_scale &&
+		buffer_data->height_scale < 1 && buffer_data->width_scale == 1)
 		buffer_data->should_scale = false;
 
 	struct wlr_scene_surface *scene_surface =
@@ -258,10 +312,10 @@ void scene_buffer_apply_effect(struct wlr_scene_buffer *buffer, int32_t sx,
 		int32_t surface_width = surface->current.width;
 		int32_t surface_height = surface->current.height;
 
-		surface_width = buffer_data->width_scale < 1
+		surface_width = buffer_data->width_scale < 1 && !buffer_data->fit
 							? surface_width
 							: buffer_data->width_scale * surface_width;
-		surface_height = buffer_data->height_scale < 1
+		surface_height = buffer_data->height_scale < 1 && !buffer_data->fit
 							 ? surface_height
 							 : buffer_data->height_scale * surface_height;
 
@@ -295,6 +349,15 @@ void scene_buffer_apply_effect(struct wlr_scene_buffer *buffer, int32_t sx,
 void buffer_set_effect(Client *c, BufferData data) {
 	if (!c || c->iskilling)
 		return;
+
+	/* As Hyprland: an opening window is scaled into its box, everything else
+	 * keeps its native size. */
+	if (config.animation_native_content && !client_is_x11(c)) {
+		if (c->animation.action == OPEN && c->animation.running)
+			data.fit = true;
+		else
+			data.native = true;
+	}
 
 	if (c->animation.tagouting || c->animation.tagouted ||
 		c->animation.tagining)
@@ -1040,7 +1103,7 @@ void client_apply_clip(Client *c, float factor) {
 	struct wlr_box clip_box;
 	bool should_render_client_surface = false;
 	struct ivec2 surface_clip_offset;
-	BufferData buffer_data;
+	BufferData buffer_data = {0};
 
 	struct fx_corner_radii current_corner_location =
 		set_client_corner_location(c);
@@ -1083,9 +1146,15 @@ void client_apply_clip(Client *c, float factor) {
 			wlr_scene_subsurface_tree_set_clip(&c->scene_surface->node,
 											   &clip_box);
 
-		buffer_set_effect(c, (BufferData){1.0f, 1.0f, clip_box.width,
-										  clip_box.height,
-										  current_corner_location, true});
+		buffer_set_effect(c, (BufferData){.width_scale = 1.0f,
+										  .height_scale = 1.0f,
+										  .width = clip_box.width,
+										  .height = clip_box.height,
+										  .corner_location =
+											  current_corner_location,
+										  .should_scale = true,
+										  .clip_x = clip_box.x,
+										  .clip_y = clip_box.y});
 		return;
 	}
 
@@ -1150,6 +1219,8 @@ void client_apply_clip(Client *c, float factor) {
 	buffer_data.should_scale = true;
 	buffer_data.width = clip_box.width;
 	buffer_data.height = clip_box.height;
+	buffer_data.clip_x = clip_box.x;
+	buffer_data.clip_y = clip_box.y;
 	buffer_data.corner_location = current_corner_location;
 
 	if (factor == 1.0 && !c->overview_scene_surface) {
