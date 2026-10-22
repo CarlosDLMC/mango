@@ -504,6 +504,7 @@ typedef struct {
 	uint32_t special_gappov;
 	uint32_t borderpx;
 	uint32_t group_bar_height;
+	int32_t group_bar_gap; /* between tabs, as Hyprland's groupbar:gaps_in */
 	uint32_t tab_bar_height;
 	uint32_t title_message_bar_height;
 	uint32_t title_message_bar_gap;

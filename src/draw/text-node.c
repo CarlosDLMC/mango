@@ -661,6 +661,8 @@ MangoBarDecoration *mango_bar_decoration_create(void *cdata, uint32_t type,
 	mangobar->padding_y = data.padding_y;
 	mangobar->font_desc =
 		g_strdup(data.font_desc ? data.font_desc : "monospace Bold 13");
+	mangobar->focus_font_desc =
+		data.focus_font_desc ? g_strdup(data.focus_font_desc) : NULL;
 
 	mangobar->target_width = width;
 	mangobar->target_height = height;
@@ -707,6 +709,7 @@ void mango_bar_decoration_destroy(MangoBarDecoration *node) {
 	measure_finish(&node->measure);
 
 	g_free(node->font_desc);
+	g_free(node->focus_font_desc);
 	g_free(node->cached_text);
 	g_free(node->cached_font_desc);
 	g_free(node->last_text);
@@ -917,12 +920,15 @@ void mango_bar_decoration_update(MangoBarDecoration *node, const char *text,
 
 	const float *fg_color =
 		node->focused ? node->focus_fg_color : node->fg_color;
+	const char *font_desc = node->focused && node->focus_font_desc
+								? node->focus_font_desc
+								: node->font_desc;
 
 	int32_t avail_w = bar_decoration_avail_width(node);
 	int32_t avail_pixel_w = (int32_t)(avail_w * scale + 0.5f);
 
 	int32_t natural_pixel_w = 0, natural_pixel_h = 0;
-	measure_text(&node->measure, node->font_desc, text, scale, &natural_pixel_w,
+	measure_text(&node->measure, font_desc, text, scale, &natural_pixel_w,
 				 &natural_pixel_h);
 
 	bool overlong = avail_pixel_w > 0 && natural_pixel_w > avail_pixel_w;
@@ -931,7 +937,7 @@ void mango_bar_decoration_update(MangoBarDecoration *node, const char *text,
 	bool dirty =
 		node->cached_scale != scale || !node->cached_text ||
 		strcmp(node->cached_text, text) != 0 || !node->cached_font_desc ||
-		strcmp(node->cached_font_desc, node->font_desc) != 0 ||
+		strcmp(node->cached_font_desc, font_desc) != 0 ||
 		memcmp(node->cached_fg_color, fg_color, sizeof(node->fg_color)) != 0 ||
 		node->cached_focused != node->focused ||
 		node->cached_center_secondary_line != node->center_secondary_line ||
@@ -941,7 +947,7 @@ void mango_bar_decoration_update(MangoBarDecoration *node, const char *text,
 		char *ellipsized = NULL;
 		const char *display = text;
 		if (overlong) {
-			ellipsized = text_ellipsize(&node->measure, node->font_desc, text,
+			ellipsized = text_ellipsize(&node->measure, font_desc, text,
 										scale, avail_pixel_w);
 			display = ellipsized;
 		}
@@ -949,7 +955,7 @@ void mango_bar_decoration_update(MangoBarDecoration *node, const char *text,
 		g_free(node->cached_text);
 		node->cached_text = g_strdup(text);
 		g_free(node->cached_font_desc);
-		node->cached_font_desc = g_strdup(node->font_desc);
+		node->cached_font_desc = g_strdup(font_desc);
 		node->cached_scale = scale;
 		memcpy(node->cached_fg_color, fg_color, sizeof(node->cached_fg_color));
 		node->cached_focused = node->focused;
@@ -962,12 +968,12 @@ void mango_bar_decoration_update(MangoBarDecoration *node, const char *text,
 		if (second_line) {
 			char *first = g_strndup(display, second_line - display);
 			surface = text_surface_create_two_lines(
-				&node->measure, node->font_desc, first, second_line + 1, scale,
+				&node->measure, font_desc, first, second_line + 1, scale,
 				fg_color, &node->surface_pixel_w, &node->surface_pixel_h);
 			g_free(first);
 		} else {
 			surface = text_surface_create(
-				&node->measure, node->font_desc, display, scale, fg_color,
+				&node->measure, font_desc, display, scale, fg_color,
 				&node->surface_pixel_w, &node->surface_pixel_h);
 		}
 		text_node_install(node->scene_buffer, &node->buffer, surface,
@@ -1112,6 +1118,9 @@ void mango_bar_decoration_apply_config(MangoBarDecoration *node,
 	g_free(node->font_desc);
 	node->font_desc =
 		g_strdup(data->font_desc ? data->font_desc : "monospace Bold 13");
+	g_free(node->focus_font_desc);
+	node->focus_font_desc =
+		data->focus_font_desc ? g_strdup(data->focus_font_desc) : NULL;
 
 	if (node->last_text) {
 		float scale = node->last_scale > 0.0f ? node->last_scale : 1.0f;
