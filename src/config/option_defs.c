@@ -83,6 +83,8 @@ bool parse_option(Config *config, char *key, char *value, int line_number) {
 		config->group_focus_wrap = atoi(value);
 	} else if (strcmp(key, "fadeout_below_top") == 0) {
 		config->fadeout_below_top = atoi(value);
+	} else if (strcmp(key, "special_slide_fade") == 0) {
+		config->special_slide_fade = atoi(value);
 	} else if (strcmp(key, "animation_fade_out") == 0) {
 		config->animation_fade_out = atoi(value);
 	} else if (strcmp(key, "tag_animation_direction") == 0) {
@@ -2442,6 +2444,7 @@ void set_value_default() {
 	config.group_auto_join = 0;
 	config.group_focus_wrap = 0;
 	config.fadeout_below_top = 0;
+	config.special_slide_fade = 0;
 	config.animation_fade_out = 1;
 	config.tag_animation_direction = HORIZONTAL;
 	config.zoom_initial_ratio = 0.4f;
@@ -2806,6 +2809,7 @@ void override_config(void) {
 	config.group_auto_join = CLAMP_INT(config.group_auto_join, 0, 1);
 	config.group_focus_wrap = CLAMP_INT(config.group_focus_wrap, 0, 1);
 	config.fadeout_below_top = CLAMP_INT(config.fadeout_below_top, 0, 1);
+	config.special_slide_fade = CLAMP_INT(config.special_slide_fade, 0, 1);
 	config.animation_fade_out = CLAMP_INT(config.animation_fade_out, 0, 1);
 	config.zoom_initial_ratio =
 		CLAMP_FLOAT(config.zoom_initial_ratio, 0.1f, 1.0f);
