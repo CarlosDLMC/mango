@@ -115,6 +115,18 @@ bool parse_option(Config *config, char *key, char *value, int line_number) {
 		config->animation_duration_tag = atoi(value);
 	} else if (strcmp(key, "animation_duration_close") == 0) {
 		config->animation_duration_close = atoi(value);
+	} else if (strcmp(key, "animation_duration_border") == 0) {
+		config->animation_duration_border = atoi(value);
+	} else if (strcmp(key, "animation_curve_border") == 0) {
+		if (parse_double_array(value, config->animation_curve_border, 4) !=
+			4) {
+			mango_error(false, WLR_ERROR,
+						"Failed to parse animation_curve_border: "
+						"\033[1m\033[31m%s\033[0m\n",
+						value);
+			return false;
+		}
+		config->border_curve_set = true;
 	} else if (strcmp(key, "animation_duration_layer_open") == 0) {
 		config->animation_duration_layer_open = atoi(value);
 	} else if (strcmp(key, "animation_duration_layer_close") == 0) {
@@ -2473,6 +2485,8 @@ void set_value_default() {
 	config.animation_duration_tag = 300;
 	config.animation_duration_close = 300;
 	config.animation_duration_layer_open = -1;
+	config.animation_duration_border = -1;
+	config.border_curve_set = false;
 	config.animation_duration_layer_close = -1;
 	config.layer_fade_in_curve_set = false;
 	config.layer_fade_out_curve_set = false;
@@ -2847,6 +2861,8 @@ void override_config(void) {
 		CLAMP_INT(config.animation_duration_close, 0, 50000);
 	config.animation_duration_layer_open =
 		CLAMP_INT(config.animation_duration_layer_open, -1, 50000);
+	config.animation_duration_border =
+		CLAMP_INT(config.animation_duration_border, -1, 50000);
 	config.animation_duration_layer_close =
 		CLAMP_INT(config.animation_duration_layer_close, -1, 50000);
 	config.animation_duration_focus =
