@@ -69,6 +69,8 @@ bool parse_option(Config *config, char *key, char *value, int line_number) {
 		config->layer_animation_type_close = animation_type_from_string(value);
 	} else if (strcmp(key, "animation_fade_in") == 0) {
 		config->animation_fade_in = atoi(value);
+	} else if (strcmp(key, "animation_native_content") == 0) {
+		config->animation_native_content = atoi(value);
 	} else if (strcmp(key, "animation_fade_out") == 0) {
 		config->animation_fade_out = atoi(value);
 	} else if (strcmp(key, "tag_animation_direction") == 0) {
@@ -2379,6 +2381,7 @@ void set_value_default() {
 	config.layer_animation_type_open = ANIM_TYPE_UNSET;
 	config.layer_animation_type_close = ANIM_TYPE_UNSET;
 	config.animation_fade_in = 1;
+	config.animation_native_content = 0;
 	config.animation_fade_out = 1;
 	config.tag_animation_direction = HORIZONTAL;
 	config.zoom_initial_ratio = 0.4f;
@@ -2727,6 +2730,8 @@ void override_config(void) {
 	config.tag_animation_direction =
 		CLAMP_INT(config.tag_animation_direction, 0, 1);
 	config.animation_fade_in = CLAMP_INT(config.animation_fade_in, 0, 1);
+	config.animation_native_content =
+		CLAMP_INT(config.animation_native_content, 0, 1);
 	config.animation_fade_out = CLAMP_INT(config.animation_fade_out, 0, 1);
 	config.zoom_initial_ratio =
 		CLAMP_FLOAT(config.zoom_initial_ratio, 0.1f, 1.0f);

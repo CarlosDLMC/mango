@@ -60,6 +60,12 @@ typedef struct {
 	int32_t height;
 	struct fx_corner_radii corner_location;
 	bool should_scale;
+	/* animation_native_content: where the visible part (the clip box) starts
+	 * inside the surface, and how the content follows the animated box. */
+	int32_t clip_x;
+	int32_t clip_y;
+	bool native; /* moves and resizes: native size, edges extended */
+	bool fit;	 /* opening: scaled to the box, down as well as up */
 } BufferData;
 
 typedef struct SnapshotMetadata {
