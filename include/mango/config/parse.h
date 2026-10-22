@@ -718,6 +718,7 @@ char **config_get_file_paths(int *count);
 void reapply_tagrule(void);
 
 void reset_option(void);
+void reapply_options(bool run_execs);
 
 void reset_tag(int old_tag_num);
 
