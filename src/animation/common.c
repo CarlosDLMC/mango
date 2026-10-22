@@ -33,6 +33,10 @@ struct dvec2 calculate_animation_curve_at(double t, int32_t type) {
 		animation_curve = config.layer_fade_out_curve_set
 							  ? config.animation_curve_layer_fade_out
 							  : config.animation_curve_opafadeout;
+	} else if (type == FOCUSBORDER) {
+		animation_curve = config.border_curve_set
+							  ? config.animation_curve_border
+							  : config.animation_curve_focus;
 	} else {
 		animation_curve = config.animation_curve_move;
 	}
@@ -69,6 +73,8 @@ void init_baked_points(void) {
 		calloc(BAKED_POINTS_COUNT, sizeof(*server.baked_points_layerfadein));
 	server.baked_points_layerfadeout =
 		calloc(BAKED_POINTS_COUNT, sizeof(*server.baked_points_layerfadeout));
+	server.baked_points_focusborder =
+		calloc(BAKED_POINTS_COUNT, sizeof(*server.baked_points_focusborder));
 
 	for (int32_t i = 0; i < BAKED_POINTS_COUNT; i++) {
 		server.baked_points_move[i] = calculate_animation_curve_at(
@@ -103,6 +109,8 @@ void init_baked_points(void) {
 			(double)i / (BAKED_POINTS_COUNT - 1), LAYERFADEIN);
 		server.baked_points_layerfadeout[i] = calculate_animation_curve_at(
 			(double)i / (BAKED_POINTS_COUNT - 1), LAYERFADEOUT);
+		server.baked_points_focusborder[i] = calculate_animation_curve_at(
+			(double)i / (BAKED_POINTS_COUNT - 1), FOCUSBORDER);
 	}
 }
 double find_animation_curve_at(double t, int32_t type) {
@@ -129,6 +137,8 @@ double find_animation_curve_at(double t, int32_t type) {
 		baked_points = server.baked_points_layerfadein;
 	} else if (type == LAYERFADEOUT) {
 		baked_points = server.baked_points_layerfadeout;
+	} else if (type == FOCUSBORDER) {
+		baked_points = server.baked_points_focusborder;
 	} else {
 		baked_points = server.baked_points_move;
 	}

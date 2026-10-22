@@ -1768,9 +1768,24 @@ void client_start_focus_animation(Client *c, bool focused) {
 	c->opacity_animation.running = true;
 }
 
+/* Progress of the border colour change: its own duration
+ * (animation_duration_border, else the focus one) from the same start. */
+static double client_focus_border_progress(Client *c) {
+	uint32_t duration = config.animation_duration_border >= 0
+							? (uint32_t)config.animation_duration_border
+							: c->opacity_animation.duration;
+	if (!duration)
+		return 1.0;
+	double p = (double)(get_now_in_ms() - c->opacity_animation.time_started) /
+			   duration;
+	return p > 1.0 ? 1.0 : p;
+}
+
 static void client_interpolate_focus_animation(Client *c,
 											   double linear_progress) {
 	double eased_progress = find_animation_curve_at(linear_progress, FOCUS);
+	double border_progress =
+		find_animation_curve_at(client_focus_border_progress(c), FOCUSBORDER);
 
 	c->opacity_animation.current_opacity =
 		c->opacity_animation.initial_opacity +
@@ -1783,7 +1798,7 @@ static void client_interpolate_focus_animation(Client *c,
 			c->opacity_animation.initial_border_color[i] +
 			(c->opacity_animation.target_border_color[i] -
 			 c->opacity_animation.initial_border_color[i]) *
-				eased_progress;
+				border_progress;
 		c->opacity_animation.current_dim_color[i] =
 			c->opacity_animation.initial_dim_color[i] +
 			(c->opacity_animation.target_dim_color[i] -
@@ -1793,7 +1808,7 @@ static void client_interpolate_focus_animation(Client *c,
 			c->opacity_animation.initial_shadow_color[i] +
 			(c->opacity_animation.target_shadow_color[i] -
 			 c->opacity_animation.initial_shadow_color[i]) *
-				eased_progress;
+				border_progress;
 	}
 }
 
@@ -1805,7 +1820,8 @@ bool client_step_focus_animation(Client *c, double linear_progress) {
 							c->opacity_animation.current_dim_color);
 	client_set_shadow_color(c, c->opacity_animation.current_shadow_color);
 
-	c->opacity_animation.running = linear_progress < 1.0;
+	c->opacity_animation.running =
+		linear_progress < 1.0 || client_focus_border_progress(c) < 1.0;
 	return c->opacity_animation.running;
 }
 
@@ -1895,9 +1911,9 @@ bool client_apply_focus_opacity(Client *c) {
 						  (double)c->opacity_animation.duration
 					: 1.0;
 
-			client_interpolate_focus_animation(c, focus_progress);
+			client_interpolate_focus_animation(c, MANGO_MIN(focus_progress, 1.0));
 			opacity = c->opacity_animation.current_opacity;
-			if (focus_progress >= 1.0) {
+			if (focus_progress >= 1.0 && client_focus_border_progress(c) >= 1.0) {
 				c->opacity_animation.running = false;
 			}
 		} else {

@@ -47,6 +47,10 @@ void free_baked_points(void) {
 		free(server.baked_points_opafadein);
 		server.baked_points_opafadein = NULL;
 	}
+	if (server.baked_points_focusborder) {
+		free(server.baked_points_focusborder);
+		server.baked_points_focusborder = NULL;
+	}
 	if (server.baked_points_layerfadein) {
 		free(server.baked_points_layerfadein);
 		server.baked_points_layerfadein = NULL;

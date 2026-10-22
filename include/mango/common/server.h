@@ -199,6 +199,7 @@ struct MangoServer {
 	struct dvec2 *baked_points_opafadeout;
 	struct dvec2 *baked_points_layerfadein;
 	struct dvec2 *baked_points_layerfadeout;
+	struct dvec2 *baked_points_focusborder;
 
 	/* Cursor hiding / input keep-alive */
 	struct wl_event_source *hide_cursor_source;
