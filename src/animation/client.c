@@ -535,15 +535,20 @@ void client_draw_group_bar(Client *c, struct ivec2 offsets) {
 		client_check_tab_node_visible(c);
 	}
 
-	int32_t bar_w = tw / count;
-	int32_t rem = tw % count;
+	/* group_bar_gap between the tabs, as Hyprland's groupbar:gaps_in. */
+	int32_t gap = config.group_bar_gap;
+	if (gap * (count - 1) >= tw)
+		gap = 0;
+	int32_t bars_w = tw - gap * (count - 1);
+	int32_t bar_w = bars_w / count;
+	int32_t rem = bars_w % count;
 	int32_t x = tab_x;
 	cur = client_group_head(c);
 
 	for (int i = 0; i < count && cur; i++) {
 		int32_t w = bar_w + (i < rem ? 1 : 0);
 		global_draw_group_bar(cur, x, tab_y, w, th);
-		x += w;
+		x += w + gap;
 		cur = cur->group_next;
 	}
 }

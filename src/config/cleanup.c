@@ -327,6 +327,10 @@ void free_config(void) {
 		free((void *)config.groupbardata.font_desc);
 		config.groupbardata.font_desc = NULL;
 	}
+	if (config.groupbardata.focus_font_desc) {
+		free((void *)config.groupbardata.focus_font_desc);
+		config.groupbardata.focus_font_desc = NULL;
+	}
 
 	if (config.tabbardata.font_desc) {
 		free((void *)config.tabbardata.font_desc);

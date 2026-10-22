@@ -602,6 +602,12 @@ bool parse_option(Config *config, char *key, char *value, int line_number) {
 		if (config->groupbardata.font_desc)
 			free((void *)config->groupbardata.font_desc);
 		config->groupbardata.font_desc = strdup(value);
+	} else if (strcmp(key, "group_bar_decorate_focus_font_desc") == 0) {
+		if (config->groupbardata.focus_font_desc)
+			free((void *)config->groupbardata.focus_font_desc);
+		config->groupbardata.focus_font_desc = strdup(value);
+	} else if (strcmp(key, "group_bar_gap") == 0) {
+		config->group_bar_gap = atoi(value);
 	} else if (strcmp(key, "group_bar_decorate_fg_color") == 0) {
 		int64_t color = parse_color(value);
 		if (color == -1) {
@@ -2540,6 +2546,7 @@ void set_value_default() {
 
 	config.borderpx = 4;
 	config.group_bar_height = 33;
+	config.group_bar_gap = 0;
 	config.tab_bar_height = 33;
 	config.title_message_bar_height = 52;
 	config.title_message_bar_gap = 20;
@@ -2990,6 +2997,7 @@ void override_config(void) {
 	config.special_gappov = CLAMP_INT(config.special_gappov, 0, 1000);
 	config.borderpx = CLAMP_INT(config.borderpx, 0, 200);
 	config.group_bar_height = CLAMP_INT(config.group_bar_height, 0, 500);
+	config.group_bar_gap = CLAMP_INT(config.group_bar_gap, 0, 500);
 	config.tab_bar_height = CLAMP_INT(config.tab_bar_height, 0, 500);
 	config.title_message_bar_height =
 		CLAMP_INT(config.title_message_bar_height, 0, 500);
