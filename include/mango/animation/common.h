@@ -11,7 +11,19 @@
 #define BAKED_POINTS_COUNT 256
 
 /* What is currently being animated / which animation phase is running. */
-enum { NONE, OPEN, MOVE, CLOSE, TAG, FOCUS, OPAFADEIN, OPAFADEOUT, OVERVIEW };
+enum {
+	NONE,
+	OPEN,
+	MOVE,
+	CLOSE,
+	TAG,
+	FOCUS,
+	OPAFADEIN,
+	OPAFADEOUT,
+	OVERVIEW,
+	LAYERFADEIN,
+	LAYERFADEOUT
+};
 
 struct dvec2 {
 	double x, y;

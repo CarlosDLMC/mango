@@ -258,7 +258,9 @@ void handle_layer_surface_map(struct wl_listener *listener, void *data) {
 
 	// Initializes the animation.
 	if (config.animations && config.layer_animations && !l->no_animation) {
-		l->animation.duration = config.animation_duration_open;
+		l->animation.duration = config.animation_duration_layer_open >= 0
+									? config.animation_duration_layer_open
+									: config.animation_duration_open;
 		l->animation.action = OPEN;
 		layer_set_pending_state(l);
 	} else {

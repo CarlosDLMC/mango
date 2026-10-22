@@ -334,6 +334,14 @@ typedef struct {
 	double animation_curve_focus[4];
 	double animation_curve_opafadein[4];
 	double animation_curve_opafadeout[4];
+	/* Layer surfaces: their own fade timing and curves; -1 / unset fall
+	 * back to the window ones. */
+	int32_t animation_duration_layer_open;
+	int32_t animation_duration_layer_close;
+	double animation_curve_layer_fade_in[4];
+	double animation_curve_layer_fade_out[4];
+	bool layer_fade_in_curve_set;
+	bool layer_fade_out_curve_set;
 
 	int32_t scroller_structs;
 	float scroller_default_proportion;
