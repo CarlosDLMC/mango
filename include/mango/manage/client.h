@@ -228,6 +228,12 @@ struct Client {
 	Client *group_prev;
 	Client *group_next;
 	bool is_group_focus;
+	/* group_keep_single: a group that stays one with a single window (made
+	 * by grouptoggle, or left by its other members), as Hyprland's groups. */
+	bool group_persist;
+	/* group_auto_join: the group window that had the focus when this one
+	 * mapped; it joins that group once its rules are applied. */
+	Client *group_join_target;
 
 	/* auto tab chain; state kept fully separate from group */
 	MangoBarDecoration *tab_bar;
@@ -462,6 +468,7 @@ void client_group_detach(Client *c);
 void client_group_replace(Client *old, Client *new);
 Client *client_group_active(Client *c);
 Client *client_group_head(Client *c);
+Client *client_group_tail(Client *c);
 Client *client_group_focused(Client *c);
 bool client_is_group_member(const Client *c);
 
