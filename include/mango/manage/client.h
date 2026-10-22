@@ -236,6 +236,10 @@ struct Client {
 	Client *group_join_target;
 	/* special_slide_fade: 1 fading in, -1 fading out with the slide. */
 	int32_t special_fade;
+	/* group_switch_fade: this tab is fading in (shown since that time, 0:
+	 * not), or this fade-out copy is the old tab fading out. */
+	uint32_t group_fade_in_started;
+	bool group_switch_fadeout;
 
 	/* auto tab chain; state kept fully separate from group */
 	MangoBarDecoration *tab_bar;

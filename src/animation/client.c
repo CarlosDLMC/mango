@@ -1279,6 +1279,9 @@ void fadeout_client_animation_next_tick(Client *c) {
 		find_animation_curve_at(animation_passed, OPAFADEOUT);
 	double percent = config.fadeout_begin_opacity -
 					 (opacity_eased_progress * config.fadeout_begin_opacity);
+	if (c->group_switch_fadeout)
+		percent = 1.0 - find_animation_curve_at(MANGO_MIN(animation_passed, 1.0),
+												FOCUS);
 	double opacity = MANGO_MAX(percent, 0);
 
 	if (config.animation_fade_out && !c->no_fade_out)
@@ -1455,6 +1458,46 @@ void init_fadeout_client(Client *c) {
 
 	request_fresh_all_monitors();
 }
+/*
+ * group_switch_fade: a copy of the tab being switched away from, fading out in
+ * place on the focus timing (Hyprland's fadeSwitch) while the new tab fades in
+ * - in the window's own layer; the caller puts it right below the new tab.
+ */
+Client *init_group_switch_fadeout(Client *old) {
+	if (!old->mon || !old->scene || client_is_unmanaged(old) ||
+		(old->shield_when_capture && server.active_capture_count > 0))
+		return NULL;
+
+	Client *f = ecalloc(1, sizeof(*f));
+	f->animation_type_open = ANIM_TYPE_UNSET;
+	f->animation_type_close = ANIM_TYPE_FADE;
+	f->group_switch_fadeout = true;
+
+	old->snapshot_temp_visible = true;
+	client_update_visibility(old);
+	f->scene = wlr_scene_tree_snapshot(&old->scene->node,
+									   server.layers[client_target_layer(old)]);
+	old->snapshot_temp_visible = false;
+	client_update_visibility(old);
+	if (!f->scene) {
+		free(f);
+		return NULL;
+	}
+
+	f->animation.duration = config.animation_duration_focus;
+	f->geom = f->animainit_geom = old->animation.current;
+	f->animation.initial = f->current = (struct wlr_box){0};
+	f->mon = old->mon;
+	f->animation.action = CLOSE;
+	f->bw = old->bw;
+	f->animation.time_started = get_now_in_ms();
+	wlr_scene_node_set_enabled(&f->scene->node, true);
+	wl_list_insert(&server.fadeout_clients, &f->fadeout_link);
+
+	request_fresh_all_monitors();
+	return f;
+}
+
 void client_apply_finish_geometry(Client *c) {
 	if (!c || !c->scene)
 		return;
@@ -1853,6 +1896,23 @@ void client_set_focused_opacity_animation(Client *c) {
 }
 
 bool client_apply_focus_opacity(Client *c) {
+	/* group_switch_fade: the tab just shown fades in on the focus timing. */
+	if (c->group_fade_in_started) {
+		float base =
+			(server.selected_monitor && c == server.selected_monitor->sel)
+				? c->focused_opacity
+				: c->unfocused_opacity;
+		uint32_t passed = get_now_in_ms() - c->group_fade_in_started;
+		double linear = config.animation_duration_focus
+							? (double)passed / config.animation_duration_focus
+							: 1.0;
+		if (linear < 1.0) {
+			client_set_opacity(c, base * find_animation_curve_at(linear, FOCUS));
+			return true;
+		}
+		c->group_fade_in_started = 0;
+		client_set_opacity(c, base);
+	}
 	/* special_slide_fade: the window fades with its special workspace slide,
 	 * on the slide's curve. */
 	if (c->special_fade) {

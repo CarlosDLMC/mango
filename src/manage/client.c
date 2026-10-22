@@ -4464,6 +4464,13 @@ bool client_group_swap_focus(Client *c) {
 	if (cur_focusing->mon->isoverview)
 		return false;
 
+	/* group_switch_fade: a copy of the old tab, taken while it is still
+	 * shown, fades out under the new one fading in. */
+	Client *fade = NULL;
+	if (config.group_switch_fade && client_animations_enabled(c) &&
+		VISIBLEON(cur_focusing, cur_focusing->mon))
+		fade = init_group_switch_fadeout(cur_focusing);
+
 	cur_focusing->is_group_focus = false;
 	c->mon = cur_focusing->mon;
 	client_replace(c, cur_focusing, true, false);
@@ -4473,6 +4480,12 @@ bool client_group_swap_focus(Client *c) {
 	mango_bar_decoration_set_focus(c->group_bar, true);
 
 	client_reparent_group(c);
+
+	if (fade) {
+		if (c->scene && c->scene->node.parent == fade->scene->node.parent)
+			wlr_scene_node_place_below(&fade->scene->node, &c->scene->node);
+		c->group_fade_in_started = get_now_in_ms();
+	}
 
 	return true;
 }

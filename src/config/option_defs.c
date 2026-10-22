@@ -85,6 +85,8 @@ bool parse_option(Config *config, char *key, char *value, int line_number) {
 		config->fadeout_below_top = atoi(value);
 	} else if (strcmp(key, "special_slide_fade") == 0) {
 		config->special_slide_fade = atoi(value);
+	} else if (strcmp(key, "group_switch_fade") == 0) {
+		config->group_switch_fade = atoi(value);
 	} else if (strcmp(key, "animation_duration_zoom") == 0) {
 		config->animation_duration_zoom = atoi(value);
 	} else if (strcmp(key, "animation_curve_zoom") == 0) {
@@ -2467,6 +2469,7 @@ void set_value_default() {
 	config.group_focus_wrap = 0;
 	config.fadeout_below_top = 0;
 	config.special_slide_fade = 0;
+	config.group_switch_fade = 0;
 	/* Hyprland's zoomFactor animation unconfigured: global, 800 ms, its
 	 * "default" curve. */
 	config.animation_duration_zoom = 800;
@@ -2841,6 +2844,7 @@ void override_config(void) {
 	config.group_focus_wrap = CLAMP_INT(config.group_focus_wrap, 0, 1);
 	config.fadeout_below_top = CLAMP_INT(config.fadeout_below_top, 0, 1);
 	config.special_slide_fade = CLAMP_INT(config.special_slide_fade, 0, 1);
+	config.group_switch_fade = CLAMP_INT(config.group_switch_fade, 0, 1);
 	config.animation_duration_zoom =
 		CLAMP_INT(config.animation_duration_zoom, 0, 50000);
 	config.animation_fade_out = CLAMP_INT(config.animation_fade_out, 0, 1);
