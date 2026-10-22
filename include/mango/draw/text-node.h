@@ -24,6 +24,8 @@ typedef struct {
 	int32_t padding_x;
 	int32_t padding_y;
 	const char *font_desc;
+	/* The focused bar's font; NULL: font_desc. */
+	const char *focus_font_desc;
 } DecorateDrawData;
 
 struct mango_text_buffer {
@@ -95,6 +97,7 @@ typedef struct MangoBarDecoration {
 	int32_t padding_x;
 	int32_t padding_y;
 	char *font_desc;
+	char *focus_font_desc;
 
 	int32_t target_width;
 	int32_t target_height;
