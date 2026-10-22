@@ -350,6 +350,11 @@ typedef struct {
 	double animation_curve_layer_fade_out[4];
 	bool layer_fade_in_curve_set;
 	bool layer_fade_out_curve_set;
+	/* The border (and shadow) colour change on focus: its own timing and
+	 * curve; -1 / unset follow animation_duration/curve_focus. */
+	int32_t animation_duration_border;
+	double animation_curve_border[4];
+	bool border_curve_set;
 
 	int32_t scroller_structs;
 	float scroller_default_proportion;
