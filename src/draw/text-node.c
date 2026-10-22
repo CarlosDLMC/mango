@@ -765,9 +765,52 @@ static void bar_decoration_apply_geometry(MangoBarDecoration *node) {
 		offset_y = 0;
 	}
 
-	wlr_scene_node_set_position(&node->scene_buffer->node,
-								border + node->padding_x + offset_x,
-								border + node->padding_y + offset_y);
+	int32_t text_x = border + node->padding_x + offset_x;
+	int32_t text_y = border + node->padding_y + offset_y;
+	wlr_scene_node_set_position(&node->scene_buffer->node, text_x, text_y);
+
+	if (node->clip_left <= 0 && node->clip_right <= 0) {
+		wlr_scene_node_set_enabled(&node->scene_buffer->node, true);
+		return;
+	}
+
+	/* Clipped: the background covers only the visible part, and the title,
+	 * still centred on the whole tab, is cropped to it. */
+	int32_t vis_l = node->clip_left > 0 ? node->clip_left : 0;
+	int32_t vis_r = width - (node->clip_right > 0 ? node->clip_right : 0);
+	int32_t bg_l = vis_l > border ? vis_l : border;
+	int32_t bg_r = vis_r < border + inner_w ? vis_r : border + inner_w;
+	rect_apply(node->bg, node->focused ? node->focus_bg_color : node->bg_color,
+			   0, bg_l, border, bg_r > bg_l ? bg_r - bg_l : 0, inner_h);
+
+	int32_t t_l = text_x > vis_l ? text_x : vis_l;
+	int32_t t_r = text_x + node->text_logical_w < vis_r
+					  ? text_x + node->text_logical_w
+					  : vis_r;
+	if (t_r <= t_l || node->text_logical_w <= 0) {
+		wlr_scene_node_set_enabled(&node->scene_buffer->node, false);
+		return;
+	}
+	const struct wlr_fbox box = {
+		.x = (t_l - text_x) * scale,
+		.y = 0,
+		.width = (t_r - t_l) * scale,
+		.height = node->text_logical_h * scale,
+	};
+	wlr_scene_buffer_set_source_box(node->scene_buffer, &box);
+	wlr_scene_buffer_set_dest_size(node->scene_buffer, t_r - t_l,
+								   node->text_logical_h);
+	wlr_scene_node_set_position(&node->scene_buffer->node, t_l, text_y);
+	wlr_scene_node_set_enabled(&node->scene_buffer->node, true);
+}
+
+void mango_bar_decoration_set_hclip(MangoBarDecoration *node, int32_t left,
+									int32_t right) {
+	if (!node || (node->clip_left == left && node->clip_right == right))
+		return;
+	node->clip_left = left;
+	node->clip_right = right;
+	bar_decoration_apply_geometry(node);
 }
 
 void mango_bar_decoration_set_size(MangoBarDecoration *node, int32_t width,

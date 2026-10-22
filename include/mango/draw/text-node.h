@@ -118,6 +118,10 @@ typedef struct MangoBarDecoration {
 	char *last_text;
 	float last_scale;
 
+	/* Pixels cut off at the left and right (a tab partly off its monitor):
+	 * the tab keeps its place and size, only what shows is clipped. */
+	int32_t clip_left;
+	int32_t clip_right;
 	int32_t text_logical_w;
 	int32_t text_logical_h;
 	int32_t logical_width;
@@ -158,6 +162,8 @@ MangoBarDecoration *mango_bar_decoration_create(void *cdata, uint32_t type,
 												DecorateDrawData data,
 												int32_t width, int32_t height);
 void mango_bar_decoration_destroy(MangoBarDecoration *node);
+void mango_bar_decoration_set_hclip(MangoBarDecoration *node, int32_t left,
+									 int32_t right);
 void mango_bar_decoration_set_size(MangoBarDecoration *node, int32_t width,
 								   int32_t height);
 void mango_bar_decoration_update(MangoBarDecoration *node, const char *text,
