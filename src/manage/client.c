@@ -1798,14 +1798,25 @@ void client_apply_rules(Client *c, Monitor **rule_mon, uint32_t *rule_tags) {
 
 	/*
 	if there is a new non-floating window in the current tag, the fullscreen
-	window in the current tag will exit fullscreen and participate in tiling
+	window in the current tag will exit fullscreen and participate in tiling.
+	With new_window_takes_over_fullscreen the new window takes its place
+	fullscreen (or maximized), as Hyprland's misc:on_focus_under_fullscreen 1.
 	 */
+	int32_t takeover_fullscreen = 0, takeover_maximized = 0;
 	wl_list_for_each(fc, &server.clients,
 					 link) if (fc && fc != c && c->tags & fc->tags && c->mon &&
 							   VISIBLEON(fc, c->mon) && ISFULLSCREEN(fc) &&
 							   !c->isfloating) {
+		takeover_fullscreen |= fc->isfullscreen;
+		takeover_maximized |= fc->ismaximizescreen;
 		clear_fullscreen_flag(fc);
 		arrange(c->mon, false, false);
+	}
+	if (config.new_window_takes_over_fullscreen && !c->isfullscreen) {
+		if (takeover_fullscreen)
+			client_apply_fullscreen(c, 1, true);
+		else if (takeover_maximized)
+			client_set_maximize_screen(c, 1, true);
 	}
 
 	if (c->isfloating && !c->iscustompos && !c->isnamedscratchpad) {
