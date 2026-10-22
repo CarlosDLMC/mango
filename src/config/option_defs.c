@@ -71,6 +71,8 @@ bool parse_option(Config *config, char *key, char *value, int line_number) {
 		config->animation_fade_in = atoi(value);
 	} else if (strcmp(key, "animation_native_content") == 0) {
 		config->animation_native_content = atoi(value);
+	} else if (strcmp(key, "bind_repeat_flagged_only") == 0) {
+		config->bind_repeat_flagged_only = atoi(value);
 	} else if (strcmp(key, "animation_fade_out") == 0) {
 		config->animation_fade_out = atoi(value);
 	} else if (strcmp(key, "tag_animation_direction") == 0) {
@@ -1929,7 +1931,7 @@ bool parse_option(Config *config, char *key, char *value, int line_number) {
 
 		config->exec_once_count++;
 
-	} else if (regex_match("^bind[s|l|r|p|c]*$", key)) {
+	} else if (regex_match("^bind[s|l|r|p|c|e]*$", key)) {
 		config->key_bindings =
 			realloc(config->key_bindings,
 					(config->key_bindings_count + 1) * sizeof(KeyBinding));
@@ -2382,6 +2384,7 @@ void set_value_default() {
 	config.layer_animation_type_close = ANIM_TYPE_UNSET;
 	config.animation_fade_in = 1;
 	config.animation_native_content = 0;
+	config.bind_repeat_flagged_only = 0;
 	config.animation_fade_out = 1;
 	config.tag_animation_direction = HORIZONTAL;
 	config.zoom_initial_ratio = 0.4f;
@@ -2732,6 +2735,8 @@ void override_config(void) {
 	config.animation_fade_in = CLAMP_INT(config.animation_fade_in, 0, 1);
 	config.animation_native_content =
 		CLAMP_INT(config.animation_native_content, 0, 1);
+	config.bind_repeat_flagged_only =
+		CLAMP_INT(config.bind_repeat_flagged_only, 0, 1);
 	config.animation_fade_out = CLAMP_INT(config.animation_fade_out, 0, 1);
 	config.zoom_initial_ratio =
 		CLAMP_FLOAT(config.zoom_initial_ratio, 0.1f, 1.0f);
