@@ -103,7 +103,14 @@ void set_arrange_visible(Monitor *m, Client *c, bool want_animation) {
 		if (want_animation && client_animations_enabled(c)) {
 			c->animation.tagining = true;
 			c->animainit_geom = c->geom;
-			c->animainit_geom.y = c->mon->m.y - c->geom.height;
+			if (config.special_slide_fade) {
+				/* Hyprland's special workspace: in from the right, a monitor
+				 * width away, fading in. */
+				c->animainit_geom.x = c->geom.x + c->mon->m.width;
+				c->special_fade = 1;
+			} else {
+				c->animainit_geom.y = c->mon->m.y - c->geom.height;
+			}
 		} else {
 			c->animainit_geom.x = c->animation.current.x;
 			c->animainit_geom.y = c->animation.current.y;
@@ -206,7 +213,13 @@ void set_arrange_hidden(Monitor *m, Client *c, bool want_animation) {
 			c->animation.tagouting = true;
 			c->animation.tagining = false;
 			c->pending = c->geom;
-			c->pending.y = c->mon->m.y - c->geom.height;
+			if (config.special_slide_fade) {
+				/* Out to the right, fading out. */
+				c->pending.x = c->geom.x + c->mon->m.width;
+				c->special_fade = -1;
+			} else {
+				c->pending.y = c->mon->m.y - c->geom.height;
+			}
 			resize(c, c->geom, (ResizeOpts){.interact = 0});
 		} else {
 			c->animation.running = false;

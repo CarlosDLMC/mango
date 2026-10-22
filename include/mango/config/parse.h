@@ -321,6 +321,7 @@ typedef struct {
 	int32_t group_auto_join;
 	int32_t group_focus_wrap;
 	int32_t fadeout_below_top;
+	int32_t special_slide_fade;
 	int32_t animation_fade_out;
 	int32_t tag_animation_direction;
 	float zoom_initial_ratio;
