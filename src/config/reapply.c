@@ -152,14 +152,20 @@ void reapply_tagrule(void) {
 	}
 }
 
-void reset_option(void) {
+/* A config reload: everything, exec= lines included (as Hyprland's exec). */
+void reset_option(void) { reapply_options(true); }
+
+/* setoption applies one option: it re-applies the config as a reload does,
+ * but does not run the exec= lines again. */
+void reapply_options(bool run_execs) {
 	init_baked_points();
 	pointer_cursor_activity();
 	reset_keyboard_layout();
 	reset_blur_params();
 	set_env_without_display();
 	set_env_display();
-	run_exec();
+	if (run_execs)
+		run_exec();
 
 	reapply_cursor_style();
 	reapply_property();
