@@ -47,6 +47,7 @@ void client_animation_resume(Client *c, double remaining);
 void fadeout_client_animation_next_tick(Client *c);
 void client_animation_next_tick(Client *c);
 void init_fadeout_client(Client *c);
+Client *init_group_switch_fadeout(Client *old);
 bool client_animations_enabled(const Client *c);
 
 /* Applies the final window state when animation is disabled: position,
