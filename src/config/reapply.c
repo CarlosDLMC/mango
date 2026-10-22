@@ -169,6 +169,7 @@ void reapply_options(bool run_execs) {
 	set_env_display();
 	if (run_execs)
 		run_exec();
+	fadeout_layer_sync();
 
 	reapply_cursor_style();
 	reapply_property();

@@ -540,6 +540,7 @@ void setup(void) {
 	server.drag_icon = wlr_scene_tree_create(&server.scene->tree);
 	wlr_scene_node_place_below(&server.drag_icon->node,
 							   &server.layers_wrap[LyrBlock]->node);
+	fadeout_layer_sync();
 
 	/* Create a renderer with the default implementation */
 	if (!(server.renderer = fx_renderer_create(server.backend)))
