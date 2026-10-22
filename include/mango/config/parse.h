@@ -479,6 +479,8 @@ typedef struct {
 	int32_t shadows_position_x;
 	int32_t shadows_position_y;
 	float shadowscolor[4];
+	float shadowscolor_inactive[4]; /* unfocused windows; unset = shadowscolor */
+	bool shadowscolor_inactive_set;
 	int32_t dim_enable;
 	float dim_focused_color[4];
 	float dim_unfocused_color[4];

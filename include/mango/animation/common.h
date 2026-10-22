@@ -63,6 +63,9 @@ struct mango_opacity_animation {
 	float current_dim_color[4];
 	float target_dim_color[4];
 	float initial_dim_color[4];
+	float current_shadow_color[4];
+	float target_shadow_color[4];
+	float initial_shadow_color[4];
 };
 
 typedef struct {
