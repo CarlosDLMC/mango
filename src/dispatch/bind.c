@@ -339,8 +339,13 @@ void client_group_join(Client *need_join_client, Client *need_replace_client) {
 		need_join_client->mon = need_replace_client->mon;
 	}
 
-	if (!client_is_group_member(need_replace_client)) {
+	if (!client_is_group_member(need_replace_client) ||
+		need_replace_client->group_persist) {
 		need_replace_client->is_group_focus = true;
+	}
+	if (config.group_keep_single) {
+		need_replace_client->group_persist = true;
+		need_join_client->group_persist = true;
 	}
 
 	need_join_client->group_next = need_replace_client;
@@ -361,6 +366,35 @@ void client_group_join(Client *need_join_client, Client *need_replace_client) {
 	if (oldmon) {
 		arrange(oldmon, false, false);
 	}
+}
+
+/* Like client_group_join, but the window becomes the tab right after
+ * the anchor (Hyprland's group:insert_after_current) and is shown. */
+void client_group_join_after(Client *need_join_client, Client *anchor) {
+	if (!need_join_client || !need_join_client->mon || !anchor ||
+		!anchor->mon || need_join_client == anchor ||
+		need_join_client->mon->isoverview)
+		return;
+
+	if (client_is_group_member(need_join_client))
+		group_leave(&(Arg){.tc = need_join_client});
+
+	if (!client_is_group_member(anchor) || anchor->group_persist)
+		anchor->is_group_focus = true;
+	if (config.group_keep_single) {
+		anchor->group_persist = true;
+		need_join_client->group_persist = true;
+	}
+
+	need_join_client->group_prev = anchor;
+	need_join_client->group_next = anchor->group_next;
+	if (anchor->group_next)
+		anchor->group_next->group_prev = need_join_client;
+	anchor->group_next = need_join_client;
+
+	client_focus_group_member(need_join_client);
+	client_sync_tiled_hint(need_join_client);
+	arrange(need_join_client->mon, false, false);
 }
 
 int32_t group_join(const Arg *arg) {
@@ -388,6 +422,16 @@ bool client_group_leave(Client *tc) {
 
 	if (tc->mon->isoverview)
 		return false;
+
+	/* A group of one (group_keep_single) just stops being one. */
+	if (!tc->group_prev && !tc->group_next) {
+		tc->group_persist = false;
+		tc->is_group_focus = false;
+		return true;
+	}
+	/* The window leaving is a plain window again; the ones that stay keep
+	 * their group, down to a group of one. */
+	tc->group_persist = false;
 
 	bool was_visible = tc->tag_visible;
 	Client *rc = tc->group_next ? tc->group_next : tc->group_prev;
@@ -420,6 +464,103 @@ int32_t group_leave(const Arg *arg) {
 	if (client_group_leave(tc))
 		arrange(tc->mon, false, false);
 
+	return 0;
+}
+
+/* Hyprland's togglegroup: a window outside a group becomes a group of one
+ * (needs group_keep_single); a window in a group breaks the whole group up
+ * into tiled windows, and keeps the focus. */
+int32_t group_toggle(const Arg *arg) {
+	if (!server.selected_monitor)
+		return 0;
+	Client *c = arg->tc ? arg->tc : server.selected_monitor->sel;
+	if (!c || !c->mon || c->mon->isoverview || c->isfloating)
+		return 0;
+
+	if (!client_is_group_member(c)) {
+		if (!config.group_keep_single)
+			return 0;
+		c->group_persist = true;
+		c->is_group_focus = true;
+		arrange(c->mon, false, false);
+		return 0;
+	}
+
+	Monitor *m = c->mon;
+	/* The shown tab leaves, the next one shows; down to the last, which then
+	 * stops being a group of one. */
+	Client *rest = c;
+	for (int32_t guard = 0; rest && guard < 256; guard++) {
+		Client *shown = client_group_focused(client_group_head(rest));
+		if (!shown)
+			break;
+		if (!shown->group_prev && !shown->group_next) {
+			shown->group_persist = false;
+			shown->is_group_focus = false;
+			break;
+		}
+		rest = shown->group_next ? shown->group_next : shown->group_prev;
+		if (!client_group_leave(shown))
+			break;
+	}
+	client_focus(c, 1);
+	arrange(m, false, false);
+	return 0;
+}
+
+/* Swaps two tabs' places in their group's chain. */
+static void group_chain_swap(Client *a, Client *b) {
+	if (a == b)
+		return;
+	if (a->group_next == b) {
+		Client *p = a->group_prev, *n = b->group_next;
+		if (p)
+			p->group_next = b;
+		if (n)
+			n->group_prev = a;
+		b->group_prev = p;
+		b->group_next = a;
+		a->group_prev = b;
+		a->group_next = n;
+	} else if (b->group_next == a) {
+		group_chain_swap(b, a);
+	} else {
+		Client *ap = a->group_prev, *an = a->group_next;
+		Client *bp = b->group_prev, *bn = b->group_next;
+		if (ap)
+			ap->group_next = b;
+		if (an)
+			an->group_prev = b;
+		if (bp)
+			bp->group_next = a;
+		if (bn)
+			bn->group_prev = a;
+		a->group_prev = bp;
+		a->group_next = bn;
+		b->group_prev = ap;
+		b->group_next = an;
+	}
+}
+
+/* Hyprland's movegroupwindow: the focused tab swaps places with the next
+ * (or previous) one; at either end, with the tab at the other end. */
+int32_t group_move(const Arg *arg) {
+	if (!server.selected_monitor)
+		return 0;
+	Client *c = arg->tc ? arg->tc : server.selected_monitor->sel;
+	if (!c || !c->mon || c->mon->isoverview || !client_is_group_member(c))
+		return 0;
+
+	Client *other = arg->i == NEXT ? c->group_next : c->group_prev;
+	if (!other)
+		other = arg->i == NEXT ? client_group_head(c) : client_group_tail(c);
+	if (!other || other == c)
+		return 0;
+
+	group_chain_swap(c, other);
+	for (Client *it = client_group_head(c); it; it = it->group_next)
+		it->need_output_flush = true;
+	arrange(c->mon, false, false);
 	return 0;
 }
 
@@ -585,11 +726,16 @@ int32_t group_focus(const Arg *arg) {
 
 	if (arg->i == NEXT) {
 		tc = c->group_next;
+		/* group_focus_wrap: past the last tab comes the first. */
+		if (!tc && config.group_focus_wrap)
+			tc = client_group_head(c);
 	} else {
 		tc = c->group_prev;
+		if (!tc && config.group_focus_wrap)
+			tc = client_group_tail(c);
 	}
 
-	if (!tc)
+	if (!tc || tc == c)
 		return 0;
 
 	client_focus_group_member(tc);

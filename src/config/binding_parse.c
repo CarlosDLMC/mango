@@ -531,6 +531,11 @@ FuncType parse_func_name(char *func_name, Arg *arg, char *arg_value,
 		(*arg).i = parse_direction(arg_value);
 	} else if (strcmp(func_name, "groupleave") == 0) {
 		func = group_leave;
+	} else if (strcmp(func_name, "grouptoggle") == 0) {
+		func = group_toggle;
+	} else if (strcmp(func_name, "groupmove") == 0) {
+		func = group_move;
+		(*arg).i = parse_circle_direction(arg_value);
 	} else if (strcmp(func_name, "focusid") == 0) {
 		func = focus_by_id;
 	} else if (strcmp(func_name, "incnmaster") == 0) {

@@ -1803,6 +1803,18 @@ void client_apply_rules(Client *c, Monitor **rule_mon, uint32_t *rule_tags) {
 			client_set_maximize_screen(c, 1, true);
 	}
 
+	/* group_auto_join: a new tiled window opened from a group's shown tab
+	 * becomes a tab after it, as Hyprland's group:auto_group with
+	 * group:insert_after_current. */
+	Client *gt = c->group_join_target;
+	c->group_join_target = NULL;
+	if (gt && gt != c && gt->mon && gt->mon == c->mon &&
+		client_is_group_member(gt) && gt->is_group_focus &&
+		VISIBLEON(gt, c->mon) && !c->isfloating && !c->isfullscreen &&
+		!c->ismaximizescreen && !c->isnamedscratchpad &&
+		!c->is_in_scratchpad && !client_is_unmanaged(c))
+		client_group_join_after(c, gt);
+
 	if (c->isfloating && !c->iscustompos && !c->isnamedscratchpad) {
 		wl_list_safe_reinsert_prev(&server.clients, &c->link);
 		set_float_malposition(c);
@@ -2415,7 +2427,15 @@ void handle_client_map(struct wl_listener *listener, void *data) {
 
 	wl_list_insert(&server.focus_stack, &c->flink);
 
+	/* group_auto_join: the window that has the focus until this one takes it.
+	 * client_apply_rules joins its group when the new window ends up tiled
+	 * beside it. */
+	c->group_join_target =
+		config.group_auto_join && server.selected_monitor
+			? server.selected_monitor->sel
+			: NULL;
 	client_apply_rules(c, NULL, NULL);
+	c->group_join_target = NULL;
 
 	client_apply_xwayland(c);
 
@@ -2555,7 +2575,9 @@ void handle_client_unmap(struct wl_listener *listener, void *data) {
 	if (c->swallowing) {
 		c->swallowing->mon = c->mon;
 		client_replace(c->swallowing, c, false, true);
-	} else if (client_is_group_member(c) && c->is_group_focus) {
+	} else if ((c->group_prev || c->group_next) && c->is_group_focus) {
+		/* A group of one has no tab to take its place: it closes as a
+		 * plain window. */
 		Client *group_replacement =
 			c->group_next ? c->group_next : c->group_prev;
 		group_replacement->mon = c->mon;
@@ -4551,7 +4573,14 @@ Client *client_group_head(Client *c) {
 }
 
 bool client_is_group_member(const Client *c) {
-	return c && (c->group_prev || c->group_next);
+	return c && (c->group_prev || c->group_next || c->group_persist);
+}
+
+Client *client_group_tail(Client *c) {
+	Client *tail = c;
+	while (tail && tail->group_next)
+		tail = tail->group_next;
+	return tail;
 }
 
 Client *client_group_focused(Client *c) {
