@@ -1292,6 +1292,21 @@ float *get_border_color(Client *c) {
 	}
 }
 
+/* As Hyprland's col.shadow / col.shadow_inactive: the focused window's shadow
+ * and everyone else's. */
+float *get_shadow_color(Client *c) {
+	if (c->mon == server.selected_monitor && server.selected_monitor &&
+		c == server.selected_monitor->sel)
+		return config.shadowscolor;
+	return config.shadowscolor_inactive_set ? config.shadowscolor_inactive
+											: config.shadowscolor;
+}
+
+void client_set_shadow_color(Client *c, const float color[4]) {
+	if (c->shadow)
+		wlr_scene_shadow_set_color(c->shadow, color);
+}
+
 float *get_dim_color(Client *c) {
 
 	if (server.selected_monitor && server.selected_monitor->sel == c) {
@@ -3791,11 +3806,17 @@ void client_update_border_color(Client *c) {
 
 	float *border_color = get_border_color(c);
 	float *dim_color = get_dim_color(c);
+	float *shadow_color = get_shadow_color(c);
 	memcpy(c->opacity_animation.target_border_color, border_color,
 		   sizeof(c->opacity_animation.target_border_color));
 	memcpy(c->opacity_animation.target_dim_color, dim_color,
 		   sizeof(c->opacity_animation.target_dim_color));
+	memcpy(c->opacity_animation.target_shadow_color, shadow_color,
+		   sizeof(c->opacity_animation.target_shadow_color));
+	memcpy(c->opacity_animation.current_shadow_color, shadow_color,
+		   sizeof(c->opacity_animation.current_shadow_color));
 	client_set_state_colors(c, border_color, dim_color);
+	client_set_shadow_color(c, shadow_color);
 }
 
 void client_add_dim_node(Client *c) {

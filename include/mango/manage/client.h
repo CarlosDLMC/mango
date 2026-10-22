@@ -353,6 +353,8 @@ Client *client_focus_top(Monitor *m);
 Client *get_next_stack_client(Client *c, bool reverse);
 float *get_border_color(Client *c);
 float *get_dim_color(Client *c);
+float *get_shadow_color(Client *c);
+void client_set_shadow_color(Client *c, const float color[4]);
 
 int32_t is_single_bit_set(uint32_t x);
 bool client_only_in_one_tag(Client *c);

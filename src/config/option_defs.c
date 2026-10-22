@@ -1002,6 +1002,18 @@ bool parse_option(Config *config, char *key, char *value, int line_number) {
 		} else {
 			convert_hex_to_rgba(config->shadowscolor, color);
 		}
+	} else if (strcmp(key, "shadows_color_inactive") == 0) {
+		int64_t color = parse_color(value);
+		if (color == -1) {
+			mango_error(false, WLR_ERROR,
+						"Invalid shadows_color_inactive "
+						"format: \033[1m\033[31m%s\033[0m\n",
+						value);
+			return false;
+		} else {
+			convert_hex_to_rgba(config->shadowscolor_inactive, color);
+			config->shadowscolor_inactive_set = true;
+		}
 	} else if (strcmp(key, "dim_enable") == 0) {
 		config->dim_enable = atoi(value);
 	} else if (strcmp(key, "dim_focused_color") == 0) {
@@ -2595,6 +2607,7 @@ void set_value_default() {
 	config.shadowscolor[1] = 0.0f;
 	config.shadowscolor[2] = 0.0f;
 	config.shadowscolor[3] = 1.0f;
+	config.shadowscolor_inactive_set = false;
 
 	config.dim_enable = 0;
 	config.dim_focused_color[0] = 0.0f;

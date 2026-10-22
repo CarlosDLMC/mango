@@ -122,6 +122,9 @@ void reapply_property(void) {
 			}
 			client_set_group_config(c);
 			client_apply_tab_bar_config(c);
+			/* New border and shadow colours (wallust rewrites them on a
+			 * wallpaper change) show at once, not at the next focus change. */
+			client_update_border_color(c);
 		}
 	}
 }

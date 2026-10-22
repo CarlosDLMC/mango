@@ -1754,6 +1754,11 @@ void client_start_focus_animation(Client *c, bool focused) {
 		   sizeof(c->opacity_animation.target_border_color));
 	memcpy(c->opacity_animation.target_dim_color, dim_color,
 		   sizeof(c->opacity_animation.target_dim_color));
+	memcpy(c->opacity_animation.target_shadow_color, get_shadow_color(c),
+		   sizeof(c->opacity_animation.target_shadow_color));
+	memcpy(c->opacity_animation.initial_shadow_color,
+		   c->opacity_animation.current_shadow_color,
+		   sizeof(c->opacity_animation.initial_shadow_color));
 	c->opacity_animation.initial_opacity = c->opacity_animation.current_opacity;
 	memcpy(c->opacity_animation.initial_border_color,
 		   c->opacity_animation.current_border_color,
@@ -1786,6 +1791,11 @@ static void client_interpolate_focus_animation(Client *c,
 			(c->opacity_animation.target_dim_color[i] -
 			 c->opacity_animation.initial_dim_color[i]) *
 				eased_progress;
+		c->opacity_animation.current_shadow_color[i] =
+			c->opacity_animation.initial_shadow_color[i] +
+			(c->opacity_animation.target_shadow_color[i] -
+			 c->opacity_animation.initial_shadow_color[i]) *
+				eased_progress;
 	}
 }
 
@@ -1795,6 +1805,7 @@ bool client_step_focus_animation(Client *c, double linear_progress) {
 	client_set_opacity(c, c->opacity_animation.current_opacity);
 	client_set_state_colors(c, c->opacity_animation.current_border_color,
 							c->opacity_animation.current_dim_color);
+	client_set_shadow_color(c, c->opacity_animation.current_shadow_color);
 
 	c->opacity_animation.running = linear_progress < 1.0;
 	return c->opacity_animation.running;
