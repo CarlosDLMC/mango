@@ -2852,8 +2852,24 @@ void handle_client_activation_request(struct wl_listener *listener,
 	Client *c = NULL;
 	toplevel_from_wlr_surface(event->surface, &c, NULL);
 
-	if (!c || !c->foreign_toplevel)
+	if (!c || (!c->foreign_toplevel && !client_is_group_member(c)))
 		return;
+
+	/* A hidden tab of a group: go to the group's workspace and bring the
+	 * tab forward, as Hyprland does. Focusing it alone left it behind the
+	 * tab on show. */
+	if (config.focus_on_activate && !c->istagsilent &&
+		client_is_group_member(c) && !c->is_group_focus) {
+		Client *shown = client_group_focused(client_group_head(c));
+		if (shown && shown->mon && !shown->mon->isoverview) {
+			if (!(shown->mon == server.selected_monitor &&
+				  shown->tags & shown->mon->tagset[shown->mon->seltags]))
+				client_view_on_monitor(&(Arg){.ui = shown->tags}, true,
+									   shown->mon, true);
+			client_focus_group_member(c);
+			return;
+		}
+	}
 
 	if (config.focus_on_activate && !c->istagsilent &&
 		c != server.selected_monitor->sel) {
