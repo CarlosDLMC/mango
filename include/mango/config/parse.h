@@ -323,6 +323,7 @@ typedef struct {
 	int32_t fadeout_below_top;
 	int32_t special_slide_fade;
 	int32_t group_switch_fade;
+	int32_t activation_unfocused_tokens;
 	int32_t animation_duration_zoom;
 	double animation_curve_zoom[4];
 	int32_t animation_fade_out;
