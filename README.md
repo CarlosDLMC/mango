@@ -1,3 +1,11 @@
+NOTE: This is a personal fork made to replicate my previous personal hyprland setup.
+This code keeps all my functionality while using less resources.
+This works for my personal setup but may not work for yours.
+
+<img width="1541" height="445" alt="image" src="https://github.com/user-attachments/assets/f2ff2c16-b4ee-4386-816f-b9ee37445f6b" />
+
+
+
 <div align="center">
   <img src="assets/mango.svg" alt="Mango Logo" width="120"/>
 
