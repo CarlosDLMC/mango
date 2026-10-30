@@ -537,8 +537,15 @@ void handle_new_foreign_toplevel_capture_request(struct wl_listener *listener,
 		*request = data;
 	Client *c = request->toplevel_handle->data;
 
-	if (c->shield_when_capture)
+	/* A refused capture still answers with a source - an inert one, as
+	 * wlroots gives for a window that is gone - so the client's session
+	 * just stops. Without it the client's next request names an object
+	 * that was never made, and that protocol error disconnects it. */
+	if (c->shield_when_capture) {
+		wlr_ext_foreign_toplevel_image_capture_source_manager_v1_request_accept(
+			request, NULL);
 		return;
+	}
 
 	if (c->image_capture_source == NULL) {
 		c->image_capture_source =
@@ -546,6 +553,8 @@ void handle_new_foreign_toplevel_capture_request(struct wl_listener *listener,
 				&c->image_capture_scene->tree.node, server.event_loop,
 				server.allocator, server.renderer);
 		if (c->image_capture_source == NULL) {
+			wlr_ext_foreign_toplevel_image_capture_source_manager_v1_request_accept(
+				request, NULL);
 			return;
 		}
 	}
