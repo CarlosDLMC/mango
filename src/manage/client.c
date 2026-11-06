@@ -2872,12 +2872,21 @@ void handle_client_set_title(struct wl_listener *listener, void *data) {
 		return;
 
 	const char *title = client_get_title(c);
+	struct wayland_string wayland_title;
+	const char *clamped_title = wayland_string_set(&wayland_title, title);
+
+	/* The same title set again (a shell prompt, a page re-setting its
+	 * document.title) changes nothing: it re-measured the tab titles,
+	 * sent the title to every foreign-toplevel client and a full status
+	 * snapshot to the bar. The ext handle keeps the title last sent. */
+	if (c->ext_foreign_toplevel && c->ext_foreign_toplevel->title &&
+		strcmp(c->ext_foreign_toplevel->title, clamped_title) == 0)
+		return;
+
 	client_update_group_bar_title(c);
 	client_update_tab_bar_title(c);
 	title_message_bar_update_title(c);
 
-	struct wayland_string wayland_title;
-	const char *clamped_title = wayland_string_set(&wayland_title, title);
 	if (c->foreign_toplevel)
 		wlr_foreign_toplevel_handle_v1_set_title(c->foreign_toplevel,
 												 clamped_title);
