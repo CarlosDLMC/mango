@@ -1816,6 +1816,11 @@ void client_set_rules(Client *c, Monitor **rule_mon, uint32_t *rule_tags) {
 		wl_list_safe_reinsert_prev(&server.focus_stack, &c->flink);
 	}
 
+	/* group_auto_join: the size of the tab c may join, before c is tiled
+	 * beside it (see below). */
+	struct wlr_box join_target_geom =
+		c->group_join_target ? c->group_join_target->geom : (struct wlr_box){0};
+
 	client_set_monitor(c, mon, newtags, should_init_get_focus);
 	client_reparent_group(c);
 
@@ -1870,8 +1875,18 @@ void client_set_rules(Client *c, Monitor **rule_mon, uint32_t *rule_tags) {
 		client_is_group_member(gt) && gt->is_group_focus &&
 		VISIBLEON(gt, c->mon) && !c->isfloating && !c->isfullscreen &&
 		!c->ismaximizescreen && !c->isnamedscratchpad &&
-		!c->is_in_scratchpad && !client_is_unmanaged(c))
+		!c->is_in_scratchpad && !client_is_unmanaged(c)) {
 		client_group_join_after(c, gt);
+		/* c was tiled beside gt before joining, and gt was asked to take
+		 * half its size. gt is a hidden tab now: ask for its old size again
+		 * before that configure goes out (it is sent when the event loop
+		 * idles), so the app never re-renders at half width while hidden
+		 * nor shows that frame when its tab comes back. */
+		if (!client_is_x11(gt) && join_target_geom.width > 0 &&
+			join_target_geom.height > 0 && gt->surface.xdg->initialized)
+			client_set_size(gt, join_target_geom.width - 2 * gt->bw,
+							join_target_geom.height - 2 * gt->bw, false);
+	}
 
 	if (c->isfloating && !c->iscustompos && !c->isnamedscratchpad) {
 		wl_list_safe_reinsert_prev(&server.clients, &c->link);
@@ -2340,6 +2355,21 @@ static void client_negotiate_initial_size(Client *c, Monitor *rule_mon,
 									  ? c->float_geom
 									  : c->geom,
 								  bw);
+		c->mon = saved_mon;
+		c->tags = saved_tags;
+		return;
+	}
+
+	/* group_auto_join: a window that will become a tab of the shown group tab
+	 * (the conditions handle_client_map and client_set_rules check) is first
+	 * asked for that tab's size, not the split it would get beside it, so its
+	 * first frame is not drawn at the wrong size. */
+	Client *gt = server.selected_monitor ? server.selected_monitor->sel : NULL;
+	if (config.group_auto_join && gt && gt != c && gt->mon == m &&
+		m == server.selected_monitor && client_is_group_member(gt) &&
+		gt->is_group_focus && VISIBLEON(gt, m) && !c->isnamedscratchpad &&
+		!c->is_in_scratchpad && gt->geom.width > 0 && gt->geom.height > 0) {
+		client_configure_size(c, gt->geom, bw);
 		c->mon = saved_mon;
 		c->tags = saved_tags;
 		return;
