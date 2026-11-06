@@ -56,6 +56,9 @@ void handle_snapshot_meta_destroy(struct wl_listener *listener, void *data) {
 	free(meta);
 }
 void init_baked_points(void) {
+	/* setoption re-bakes without the free_config a reload does first: the
+	 * old tables (10 x 4 KB) would leak on every call. */
+	free_baked_points();
 	server.baked_points_move =
 		calloc(BAKED_POINTS_COUNT, sizeof(*server.baked_points_move));
 	server.baked_points_open =
