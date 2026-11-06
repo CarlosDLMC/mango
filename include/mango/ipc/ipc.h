@@ -40,6 +40,8 @@ struct ipc_watch_client {
 	int fd;
 	struct wl_event_source *source;
 	enum ipc_watch_type type;
+	/* The last state snapshot sent, to skip an identical one. */
+	char *last_line;
 	union {
 		struct {
 			char name[64];

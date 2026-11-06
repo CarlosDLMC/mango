@@ -285,7 +285,28 @@ void ipc_remove_watch_client(struct ipc_watch_client *wc) {
 	wl_list_remove(&wc->link);
 	wl_event_source_remove(wc->source);
 	close(wc->fd);
+	free(wc->last_line);
 	free(wc);
+}
+
+/*
+ * Sends one line to a watch subscriber. A state snapshot (dedupe) that is
+ * identical to the last one this subscriber got is not sent again: one user
+ * action emitted several, most of them unchanged, and the bar woke up and
+ * parsed each one. Event lines (a layer surface opened) always go out.
+ */
+static void ipc_watch_send(struct ipc_watch_client *wc, const char *line,
+						   size_t len, bool dedupe) {
+	if (dedupe && wc->last_line && strcmp(wc->last_line, line) == 0)
+		return;
+	if (send(wc->fd, line, len, 0) < 0) {
+		ipc_remove_watch_client(wc);
+		return;
+	}
+	if (dedupe) {
+		free(wc->last_line);
+		wc->last_line = strdup(line);
+	}
 }
 
 int ipc_watch_data_handler(int fd, uint32_t mask, void *data) {
@@ -410,8 +431,7 @@ void ipc_notify_client(Client *c) {
 				snprintf(json_str, len + 2, "%s\n", raw);
 				free(raw);
 			}
-			if (send(wc->fd, json_str, len + 1, 0) < 0)
-				ipc_remove_watch_client(wc);
+			ipc_watch_send(wc, json_str, len + 1, true);
 		}
 	}
 	if (json_str)
@@ -436,8 +456,7 @@ void ipc_notify_tags(Monitor *m) {
 				snprintf(json_str, len + 2, "%s\n", raw);
 				free(raw);
 			}
-			if (send(wc->fd, json_str, len + 1, 0) < 0)
-				ipc_remove_watch_client(wc);
+			ipc_watch_send(wc, json_str, len + 1, true);
 		}
 	}
 	if (json_str)
@@ -461,16 +480,40 @@ void ipc_notify_all_tags(void) {
 				snprintf(json_str, len + 2, "%s\n", raw);
 				free(raw);
 			}
-			if (send(wc->fd, json_str, len + 1, 0) < 0)
-				ipc_remove_watch_client(wc);
+			ipc_watch_send(wc, json_str, len + 1, true);
 		}
 	}
 	if (json_str)
 		free(json_str);
 }
 
-void printstatus(enum ipc_watch_type type) {
+/*
+ * printstatus only collects what changed; one idle callback, run when the
+ * event loop has handled what is pending, sends it all once. A single action
+ * called it from every arrange, focus change, map and title change - two to
+ * nine full snapshots of every monitor per action, each built, sent, and
+ * parsed by the bar, plus an ext-workspace update per monitor each time.
+ */
+static uint32_t pending_status;
+static struct wl_event_source *status_idle;
+
+static void flush_status(void *data) {
+	(void)data;
+	status_idle = NULL;
+	enum ipc_watch_type type = (enum ipc_watch_type)pending_status;
+	pending_status = 0;
 	wl_signal_emit(&server.print_status_signal, &type);
+}
+
+void printstatus(enum ipc_watch_type type) {
+	pending_status |= (uint32_t)type;
+	if (status_idle)
+		return;
+	if (server.display)
+		status_idle = wl_event_loop_add_idle(
+			wl_display_get_event_loop(server.display), flush_status, NULL);
+	if (!status_idle)
+		flush_status(NULL);
 }
 
 void handle_print_status(struct wl_listener *listener, void *data) {
@@ -1181,8 +1224,7 @@ void ipc_notify_monitor(Monitor *m) {
 				snprintf(json_str, len + 2, "%s\n", raw);
 				free(raw);
 			}
-			if (send(wc->fd, json_str, len + 1, 0) < 0)
-				ipc_remove_watch_client(wc);
+			ipc_watch_send(wc, json_str, len + 1, true);
 		}
 	}
 	if (json_str)
@@ -1223,8 +1265,7 @@ void ipc_notify_last_surface_ws_name(Monitor *m) {
 			snprintf(json_str, len + 2, "%s\n", raw);
 			free(raw);
 		}
-		if (send(wc->fd, json_str, len + 1, 0) < 0)
-			ipc_remove_watch_client(wc);
+		ipc_watch_send(wc, json_str, len + 1, false);
 	}
 	free(json_str);
 }
@@ -1254,8 +1295,7 @@ void ipc_notify_focusing_client(void) {
 				snprintf(json_str, len + 2, "%s\n", raw);
 				free(raw);
 			}
-			if (send(wc->fd, json_str, len + 1, 0) < 0)
-				ipc_remove_watch_client(wc);
+			ipc_watch_send(wc, json_str, len + 1, true);
 		}
 	}
 	free(json_str);
@@ -1283,8 +1323,7 @@ void ipc_notify_all_monitors(void) {
 				snprintf(json_str, len + 2, "%s\n", raw);
 				free(raw);
 			}
-			if (send(wc->fd, json_str, len + 1, 0) < 0)
-				ipc_remove_watch_client(wc);
+			ipc_watch_send(wc, json_str, len + 1, true);
 		}
 	}
 	if (json_str)
@@ -1310,8 +1349,7 @@ void ipc_notify_all_clients(void) {
 				snprintf(json_str, len + 2, "%s\n", raw);
 				free(raw);
 			}
-			if (send(wc->fd, json_str, len + 1, 0) < 0)
-				ipc_remove_watch_client(wc);
+			ipc_watch_send(wc, json_str, len + 1, true);
 		}
 	}
 	if (json_str)
@@ -1336,8 +1374,7 @@ void ipc_notify_keymode(void) {
 				snprintf(json_str, len + 2, "%s\n", raw);
 				free(raw);
 			}
-			if (send(wc->fd, json_str, len + 1, 0) < 0)
-				ipc_remove_watch_client(wc);
+			ipc_watch_send(wc, json_str, len + 1, true);
 		}
 	}
 	if (json_str)
@@ -1362,8 +1399,7 @@ void ipc_notify_kb_layout(void) {
 				snprintf(json_str, len + 2, "%s\n", raw);
 				free(raw);
 			}
-			if (send(wc->fd, json_str, len + 1, 0) < 0)
-				ipc_remove_watch_client(wc);
+			ipc_watch_send(wc, json_str, len + 1, true);
 		}
 	}
 	if (json_str)
