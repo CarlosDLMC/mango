@@ -1949,10 +1949,24 @@ bool client_set_focus_opacity(Client *c) {
 			double eased = find_animation_curve_at(MANGO_MIN(linear, 1.0), TAG);
 			double alpha = c->special_fade > 0 ? eased : 1.0 - eased;
 			client_set_opacity(c, base * alpha);
+			/* The border and the shadow fade with the content: only the
+			 * surface faded, and a solid frame slid in around it. Both
+			 * colours are premultiplied, so every channel scales. */
+			float border[4], shadow[4];
+			for (int32_t i = 0; i < 4; i++) {
+				border[i] =
+					c->opacity_animation.current_border_color[i] * (float)alpha;
+				shadow[i] =
+					c->opacity_animation.current_shadow_color[i] * (float)alpha;
+			}
+			client_set_border_color(c, border);
+			client_set_shadow_color(c, shadow);
 			return true;
 		}
 		c->special_fade = 0;
 		client_set_opacity(c, base);
+		client_set_border_color(c, c->opacity_animation.current_border_color);
+		client_set_shadow_color(c, c->opacity_animation.current_shadow_color);
 	}
 	if (config.blur && !c->no_blur && c->blur_opacity != 1.0f &&
 		c->animation.action != OPEN) {
