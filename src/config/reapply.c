@@ -299,6 +299,25 @@ void reapply_monitor_rules(void) {
 }
 
 void reapply_cursor_style(void) {
+	/* A reload or setoption that leaves the theme and size alone keeps the
+	 * cursor manager and, above all, the cursor a client has set (none over a
+	 * fullscreen video or game, a text I-beam): rebuilding it here put the
+	 * arrow back on every wallpaper change. Only the hide timeout is
+	 * re-applied. */
+	static char applied_theme[256];
+	static int32_t applied_size = -1;
+	const char *theme = config.cursor_theme ? config.cursor_theme : "";
+	if (server.cursor_manager && server.hide_cursor_source &&
+		applied_size == (int32_t)config.cursor_size &&
+		strcmp(applied_theme, theme) == 0) {
+		if (!server.cursor_hidden)
+			wl_event_source_timer_update(server.hide_cursor_source,
+										 config.cursor_hide_timeout * 1000);
+		return;
+	}
+	snprintf(applied_theme, sizeof(applied_theme), "%s", theme);
+	applied_size = (int32_t)config.cursor_size;
+
 	if (server.hide_cursor_source) {
 		wl_event_source_timer_update(server.hide_cursor_source, 0);
 		wl_event_source_remove(server.hide_cursor_source);
