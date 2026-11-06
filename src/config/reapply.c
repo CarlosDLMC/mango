@@ -163,7 +163,7 @@ void reset_option(void) { reapply_options(true); }
 void reapply_options(bool run_execs) {
 	init_baked_points();
 	pointer_cursor_activity();
-	reset_keyboard_layout();
+	reset_keyboard_layout(false);
 	reset_blur_params();
 	set_env_without_display();
 	set_env_display();

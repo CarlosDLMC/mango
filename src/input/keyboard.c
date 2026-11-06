@@ -321,7 +321,7 @@ void handle_keyboard_shortcuts_inhibit_new_inhibitor(
 
 #ifdef XWAYLAND
 int32_t keyboard_sync_keymap(void *data) {
-	reset_keyboard_layout();
+	reset_keyboard_layout(true);
 	// we only need to sync keymap once
 	mango_error(true, WLR_INFO, "timer to synckeymap done");
 	wl_event_source_timer_update(server.sync_keymap, 0);
@@ -880,12 +880,33 @@ void handle_keyboard_modifiers(struct wl_listener *listener, void *data) {
 	}
 }
 
-void reset_keyboard_layout(void) {
+/* The xkb names the keymap was last built from. */
+static char applied_xkb_names[5][128];
+static bool applied_xkb_names_valid;
+
+static void xkb_names_copy(char out[5][128], const struct xkb_rule_names *n) {
+	const char *v[5] = {n->rules, n->model, n->layout, n->variant, n->options};
+	for (int32_t i = 0; i < 5; i++)
+		snprintf(out[i], 128, "%s", v[i] ? v[i] : "");
+}
+
+/* force: build and send the keymap even if its xkb names did not change (the
+ * Xwayland sync). Otherwise a reload or setoption that leaves them alone - a
+ * wallpaper change rewriting the colours - keeps the keymap: building it again
+ * compiled it, serialised it for every keyboard and sent it to every client,
+ * which re-parsed it. */
+void reset_keyboard_layout(bool force) {
 	if (!server.keyboard_group || !server.keyboard_group->wlr_group ||
 		!server.seat) {
 		mango_error(true, WLR_ERROR, "Invalid keyboard group or seat");
 		return;
 	}
+
+	char want_names[5][128] = {{0}};
+	xkb_names_copy(want_names, &config.xkb_rules);
+	if (!force && applied_xkb_names_valid &&
+		memcmp(want_names, applied_xkb_names, sizeof(want_names)) == 0)
+		return;
 
 	struct wlr_keyboard *keyboard = server.keyboard_group->keyboard;
 	if (!keyboard || !keyboard->keymap) {
@@ -970,6 +991,9 @@ void reset_keyboard_layout(void) {
 		wlr_seat_set_keyboard(server.seat, tkb);
 		wlr_seat_keyboard_notify_modifiers(server.seat, &tkb->modifiers);
 	}
+
+	memcpy(applied_xkb_names, want_names, sizeof(applied_xkb_names));
+	applied_xkb_names_valid = true;
 
 	// Cleanup
 	xkb_keymap_unref(new_keymap);

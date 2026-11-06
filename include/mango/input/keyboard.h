@@ -84,7 +84,7 @@ void handle_keyboard_key(struct wl_listener *listener, void *data);
 
 void handle_keyboard_modifiers(struct wl_listener *listener, void *data);
 
-void reset_keyboard_layout(void);
+void reset_keyboard_layout(bool force);
 
 void handle_keyboard_shortcuts_inhibit_new_inhibitor(
 	struct wl_listener *listener, void *data);
