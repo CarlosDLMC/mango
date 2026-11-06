@@ -1107,7 +1107,7 @@ void pointer_end_grab_client(bool follow_pointer) {
 	wlr_seat_pointer_clear_focus(server.seat);
 	pointer_process_motion(0, NULL, 0, 0, 0, 0);
 	/* Drop the window off on its new monitor */
-	if (gc == server.selected_monitor->sel) {
+	if (server.selected_monitor && gc == server.selected_monitor->sel) {
 		server.selected_monitor->sel = NULL;
 	}
 	target_mon = follow_pointer
@@ -1116,6 +1116,17 @@ void pointer_end_grab_client(bool follow_pointer) {
 										gc->geom.y + gc->geom.height / 2);
 	if (!target_mon)
 		target_mon = gc->mon;
+	if (!target_mon) {
+		/* Every output went away mid-drag: end the grab, drop nothing. */
+		server.grab_client = NULL;
+		server.start_drag_window = false;
+		gc->drag_to_tile = false;
+		if (server.drop_client) {
+			server.drop_client->enable_drop_area_draw = false;
+			server.drop_client = NULL;
+		}
+		return;
+	}
 	set_selected_monitor(target_mon);
 	client_update_oldmonname_record(gc, server.selected_monitor);
 	client_set_monitor(gc, server.selected_monitor, 0, true);

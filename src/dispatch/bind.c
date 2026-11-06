@@ -723,6 +723,8 @@ int32_t over_circle(const Arg *arg) {
 }
 
 int32_t group_focus(const Arg *arg) {
+	if (!arg->tc && !server.selected_monitor)
+		return 0;
 	Client *c = arg->tc ? arg->tc : server.selected_monitor->sel;
 	if (!c || !c->mon)
 		return 0;
