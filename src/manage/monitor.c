@@ -13,6 +13,7 @@
 #include "mango/ext-protocol/tearing.h"
 #include "mango/ext-protocol/text-input.h"
 #include "mango/ext-protocol/xdg-output.h"
+#include "mango/input/pointer.h"
 #include "mango/ipc/ipc.h"
 #include "mango/layout/arrange.h"
 #include "mango/layout/dwindle.h"
@@ -1541,6 +1542,10 @@ void handle_output_frame(struct wl_listener *listener, void *data) {
 		return;
 
 	m->frame_serial++;
+
+	/* A window being moved or resized with the mouse follows the pointer
+	 * once per frame, with its latest position. */
+	pointer_apply_grab_motion();
 
 	// Draws layers and fade-out effects.
 	for (i = 0; i < LENGTH(m->layers); i++) {

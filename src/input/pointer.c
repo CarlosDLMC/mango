@@ -1100,6 +1100,8 @@ void pointer_end_grab_client(bool follow_pointer) {
 	border_resize = server.grab_is_border_resize;
 	server.grab_is_border_resize = false;
 
+	/* The last pointer position before the release, if no frame applied it. */
+	pointer_apply_grab_motion();
 	server.cursor_mode = CurNormal;
 	/* Clear the pointer focus, this way if the cursor is over a surface
 	 * we will send an enter event after which the client will provide
@@ -1155,6 +1157,64 @@ void pointer_end_grab_client(bool follow_pointer) {
 	}
 }
 
+static Client *group_bar_target_at(double x, double y, Client *ignore);
+
+/* Moves the grabbed window to its recorded float_geom and updates the drop
+ * target under the pointer. */
+static void pointer_apply_move(Client *gc) {
+	Client *closet_drop_client = NULL;
+	Client *target = NULL;
+	if (gc->drag_to_tile)
+		target = group_bar_target_at(server.cursor->x, server.cursor->y, gc);
+	server.drop_to_group = target != NULL;
+	if (config.drag_tile_to_tile && gc->drag_to_tile)
+		closet_drop_client = target ? target : find_closest_tiled_client(gc);
+	else
+		closet_drop_client = target;
+
+	if (closet_drop_client && server.drop_client &&
+		closet_drop_client != server.drop_client) {
+		server.drop_client->enable_drop_area_draw = false;
+		client_set_drop_area(server.drop_client);
+		server.drop_client = closet_drop_client;
+		server.drop_client->enable_drop_area_draw = true;
+		client_set_drop_area(server.drop_client);
+	} else if (closet_drop_client) {
+		server.drop_client = closet_drop_client;
+		server.drop_client->enable_drop_area_draw = true;
+		client_set_drop_area(server.drop_client);
+	} else if (server.drop_client) {
+		server.drop_client->enable_drop_area_draw = false;
+		client_set_drop_area(server.drop_client);
+		server.drop_client = NULL;
+	}
+	resize(gc, gc->float_geom, (ResizeOpts){.interact = 1});
+}
+
+/*
+ * An interactive move or floating resize follows the pointer once per output
+ * frame, just before it is drawn, with the latest pointer position. Doing it
+ * on every mouse event (up to 1000 a second) moved the window, redrew its
+ * border, shadow and blur and searched for a drop target many times per
+ * frame; the old once-per-frame cap on floating resize instead dropped the
+ * last event, leaving the window short of the pointer. Called from the frame
+ * handler and when the grab ends.
+ */
+void pointer_apply_grab_motion(void) {
+	if (!server.grab_motion_pending)
+		return;
+	server.grab_motion_pending = false;
+
+	Client *gc = server.grab_client;
+	if (!gc || !gc->mon || server.session_locked)
+		return;
+
+	if (server.cursor_mode == CurMove)
+		pointer_apply_move(gc);
+	else if (server.cursor_mode == CurResize && gc->isfloating)
+		pointer_resize_floating_window(gc, server.cursor->x, server.cursor->y);
+}
+
 static Client *group_bar_target_at(double x, double y, Client *ignore) {
 	/* Borrow the transparency flag so the dragged window cannot swallow the
 	 * hit test aimed at the bar underneath it. */
@@ -1191,7 +1251,6 @@ void pointer_process_motion(uint32_t time, struct wlr_input_device *device,
 							double dy_unaccel) {
 	double sx = 0, sy = 0, sx_confined, sy_confined;
 	Client *c = NULL, *w = NULL;
-	Client *closet_drop_client = NULL;
 	LayerSurface *l = NULL;
 	MangoBarDecoration *bar = NULL;
 	struct wlr_surface *surface = NULL;
@@ -1339,54 +1398,24 @@ void pointer_process_motion(uint32_t time, struct wlr_input_device *device,
 
 	pointer_update_resize_cursor(c, surface);
 
-	/* If we are currently grabbing the mouse, handle and return */
+	/* If we are currently grabbing the mouse, handle and return. A move or a
+	 * floating resize only records the pointer here: the next output frame
+	 * applies the latest position (pointer_apply_grab_motion). */
 	if (server.cursor_mode == CurMove) {
-		/* Move the grabbed client to the new position. */
 		server.grab_client->iscustomsize = 1;
 		server.grab_client->float_geom = (struct wlr_box){
 			.x = (int32_t)round(server.cursor->x) - server.grab_offset_x,
 			.y = (int32_t)round(server.cursor->y) - server.grab_offset_y,
 			.width = server.grab_client->geom.width,
 			.height = server.grab_client->geom.height};
-		Client *target = NULL;
-		if (server.grab_client->drag_to_tile)
-			target = group_bar_target_at(server.cursor->x, server.cursor->y,
-										 server.grab_client);
-		server.drop_to_group = target != NULL;
-		if (config.drag_tile_to_tile && server.grab_client->drag_to_tile)
-			closet_drop_client =
-				target ? target : find_closest_tiled_client(server.grab_client);
-		else
-			closet_drop_client = target;
-
-		if (closet_drop_client && server.drop_client &&
-			closet_drop_client != server.drop_client) {
-			server.drop_client->enable_drop_area_draw = false;
-			client_set_drop_area(server.drop_client);
-			server.drop_client = closet_drop_client;
-			server.drop_client->enable_drop_area_draw = true;
-			client_set_drop_area(server.drop_client);
-		} else if (closet_drop_client) {
-			server.drop_client = closet_drop_client;
-			server.drop_client->enable_drop_area_draw = true;
-			client_set_drop_area(server.drop_client);
-		} else if (server.drop_client) {
-			server.drop_client->enable_drop_area_draw = false;
-			client_set_drop_area(server.drop_client);
-			server.drop_client = NULL;
-		}
-		resize(server.grab_client, server.grab_client->float_geom,
-			   (ResizeOpts){.interact = 1});
+		server.grab_motion_pending = true;
+		request_fresh_all_monitors();
 		return;
 	} else if (server.cursor_mode == CurResize) {
 		if (server.grab_client->isfloating) {
 			server.grab_client->iscustomsize = 1;
-			Monitor *m = server.grab_client->mon;
-			if (m && m->last_resize_frame != m->frame_serial) {
-				m->last_resize_frame = m->frame_serial;
-				pointer_resize_floating_window(
-					server.grab_client, server.cursor->x, server.cursor->y);
-			}
+			server.grab_motion_pending = true;
+			request_fresh_all_monitors();
 			return;
 		} else {
 			resize_tile_client(server.grab_client, true, 0, 0);

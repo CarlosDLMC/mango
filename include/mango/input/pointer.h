@@ -65,6 +65,7 @@ void pointer_resize_floating_window(Client *gc, double x, double y);
 bool pointer_begin_move_resize(Client *gc, uint32_t mode, double x, double y,
 							   uint32_t edge);
 void pointer_end_grab_client(bool follow_pointer);
+void pointer_apply_grab_motion(void);
 void pointer_process_motion(uint32_t time, struct wlr_input_device *device,
 							double dx, double dy, double dx_unaccel,
 							double dy_unaccel);
