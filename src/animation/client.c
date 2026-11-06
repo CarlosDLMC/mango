@@ -270,6 +270,13 @@ static bool scene_buffer_apply_native(struct wlr_scene_buffer *buffer,
 		buffer_data->height <= 0)
 		return false;
 
+	/* A window geometry that starts left of or above the surface (a CSD title
+	 * bar drawn as a subsurface at a negative offset, or no geometry set and
+	 * extents used) would give a negative source box, which scenefx asserts
+	 * on and aborts the compositor. Those go through the scaling path. */
+	if (buffer_data->clip_x < 0 || buffer_data->clip_y < 0)
+		return false;
+
 	/* The buffer area behind the whole surface (a viewport may pick part of
 	 * the buffer), then the clip box as a part of it, as wlroots does. */
 	struct wlr_fbox full;
