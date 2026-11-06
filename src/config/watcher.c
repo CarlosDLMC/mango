@@ -383,11 +383,34 @@ static void backend_destroy(void) {
 	}
 }
 
+static bool dir_is_needed(const char *dir) {
+	for (int i = 0; i < watched_files_count; i++) {
+		char *file_dir = path_dirname(watched_files[i].path);
+		bool same = file_dir != NULL && strcmp(file_dir, dir) == 0;
+		free(file_dir);
+		if (same)
+			return true;
+	}
+	return false;
+}
+
 static void backend_sync(void) {
 	if (inotify_fd < 0)
 		return;
 
-	clear_dir_watches();
+	/* Only the directories no longer needed lose their watch. A watch removed
+	 * and added again gets a new descriptor, and the events already queued
+	 * under the old one (a file written while the reload ran) no longer
+	 * matched anything and were dropped. */
+	for (int i = 0; i < dir_watches_count;) {
+		if (dir_is_needed(dir_watches[i].dir)) {
+			i++;
+			continue;
+		}
+		inotify_rm_watch(inotify_fd, dir_watches[i].wd);
+		free(dir_watches[i].dir);
+		dir_watches[i] = dir_watches[--dir_watches_count];
+	}
 	for (int i = 0; i < watched_files_count; i++) {
 		char *dir = path_dirname(watched_files[i].path);
 		if (dir != NULL) {
@@ -524,17 +547,48 @@ void config_watcher_init(struct wl_event_loop *loop) {
 }
 
 void config_watcher_update(void) {
-	clear_watched_files();
+	/* A file that stays tracked keeps the state it had before this reload
+	 * parsed it (on_watch_timer refreshed it just before reloading). Taking a
+	 * fresh state here swallowed a write that landed during the reload - a
+	 * wallpaper change writes one colour file, then another a moment later -
+	 * as the next check then saw no change against it. */
+	WatchedFile *old_files = watched_files;
+	int old_count = watched_files_count;
+	watched_files = NULL;
+	watched_files_count = 0;
+
+	if (watcher_active && config.auto_reload_config) {
+		int count = 0;
+		char **paths = config_get_file_paths(&count);
+		for (int i = 0; i < count; i++) {
+			if (paths[i] != NULL)
+				track_path(paths[i]);
+		}
+		for (int i = 0; i < watched_files_count; i++) {
+			WatchedFile *file = &watched_files[i];
+			for (int j = 0; j < old_count; j++) {
+				const WatchedFile *old = &old_files[j];
+				if (!old->seen || strcmp(old->path, file->path) != 0)
+					continue;
+				file->exists = old->exists;
+				file->dev = old->dev;
+				file->ino = old->ino;
+				file->size = old->size;
+				file->mtime = old->mtime;
+				break;
+			}
+		}
+	}
+
+	for (int i = 0; i < old_count; i++) {
+		if (old_files[i].fd >= 0)
+			close(old_files[i].fd);
+		free(old_files[i].path);
+	}
+	free(old_files);
 
 	if (!watcher_active || !config.auto_reload_config)
 		return;
-
-	int count = 0;
-	char **paths = config_get_file_paths(&count);
-	for (int i = 0; i < count; i++) {
-		if (paths[i] != NULL)
-			track_path(paths[i]);
-	}
 
 	backend_sync();
 }
