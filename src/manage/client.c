@@ -651,11 +651,25 @@ uint32_t client_set_size(Client *c, uint32_t width, uint32_t height,
 		return 1;
 	}
 #endif
-	if ((int32_t)width == c->surface.xdg->toplevel->current.width &&
-		(int32_t)height == c->surface.xdg->toplevel->current.height)
-		return 0;
+	/*
+	 * Compare with the size last asked for (scheduled), not the one the client
+	 * last acked (current). Against current, every commit that came in before
+	 * the ack (handle_client_commit re-runs resize() while the size is
+	 * pending) sent the same size again: a new configure, and another redraw
+	 * for the client, per commit. And going back to the acked size while
+	 * another one was in flight sent nothing, so the client drew the wrong
+	 * size first. A configure already in flight keeps its serial.
+	 */
+	struct wlr_xdg_toplevel *toplevel = c->surface.xdg->toplevel;
+	if ((int32_t)width == toplevel->scheduled.width &&
+		(int32_t)height == toplevel->scheduled.height) {
+		if ((int32_t)width == toplevel->current.width &&
+			(int32_t)height == toplevel->current.height)
+			return 0;
+		return c->configure_serial;
+	}
 
-	return wlr_xdg_toplevel_set_size(c->surface.xdg->toplevel, (int32_t)width,
+	return wlr_xdg_toplevel_set_size(toplevel, (int32_t)width,
 									 (int32_t)height);
 }
 
