@@ -1312,10 +1312,13 @@ void pointer_process_motion(uint32_t time, struct wlr_input_device *device,
 		sy = server.cursor->y - (l ? l->scene->node.y : w->geom.y);
 	}
 
-	/* Update drag icon's position */
-	wlr_scene_node_set_position(&server.drag_icon->node,
-								(int32_t)round(server.cursor->x),
-								(int32_t)round(server.cursor->y));
+	/* Update drag icon's position - only while there is one: moving even the
+	 * empty tree makes the scene walk every node to find what it damaged, on
+	 * every pointer event. */
+	if (!wl_list_empty(&server.drag_icon->children))
+		wlr_scene_node_set_position(&server.drag_icon->node,
+									(int32_t)round(server.cursor->x),
+									(int32_t)round(server.cursor->y));
 
 	if (server.group_bar_drag_pending) {
 		double ddx = server.cursor->x - server.group_bar_drag_x;
@@ -1581,6 +1584,10 @@ void handle_start_drag(struct wl_listener *listener, void *data) {
 
 	drag->icon->data =
 		&wlr_scene_drag_icon_create(server.drag_icon, drag->icon)->node;
+	/* The icon starts at the pointer, not where the last drag left it. */
+	wlr_scene_node_set_position(&server.drag_icon->node,
+								(int32_t)round(server.cursor->x),
+								(int32_t)round(server.cursor->y));
 	LISTEN_STATIC(&drag->icon->events.destroy, handle_drag_icon_destroy);
 }
 
