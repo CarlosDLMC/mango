@@ -180,30 +180,38 @@ static void measure_text(struct mango_text_measure *measure,
 	pango_layout_get_pixel_size(measure->layout, out_pixel_w, out_pixel_h);
 }
 
+/*
+ * The longest prefix that fits with "…" after it, found by bisection over the
+ * character count: a few layouts instead of one per character (a long browser
+ * title cost up to 0.7 ms per tab, every frame of a resize animation). Prefix
+ * widths only grow, so this is the prefix the one-by-one scan found.
+ */
 static char *text_ellipsize_line(struct mango_text_measure *measure,
 								 const char *font_desc, const char *text,
 								 float scale, int32_t max_pixel_w) {
 	int32_t pixel_w = 0, pixel_h = 0;
-	int32_t best = 0;
-	const char *end = text + strlen(text);
 
 	measure_text(measure, font_desc, "…", scale, &pixel_w, &pixel_h);
 	if (pixel_w > max_pixel_w) {
 		return g_strdup("…");
 	}
 
-	for (const char *pos = g_utf8_next_char(text); pos <= end;
-		 pos = g_utf8_next_char(pos)) {
-		int32_t length = (int32_t)(pos - text);
+	/* lo characters fit (0 always does: "…" alone fits), hi do not. */
+	glong count = g_utf8_strlen(text, -1);
+	glong lo = 0, hi = count + 1;
+	while (hi - lo > 1) {
+		glong mid = lo + (hi - lo) / 2;
+		int32_t length = (int32_t)(g_utf8_offset_to_pointer(text, mid) - text);
 		char *candidate = g_strdup_printf("%.*s…", length, text);
 		measure_text(measure, font_desc, candidate, scale, &pixel_w, &pixel_h);
 		g_free(candidate);
-		if (pixel_w > max_pixel_w) {
-			break;
-		}
-		best = length;
+		if (pixel_w > max_pixel_w)
+			hi = mid;
+		else
+			lo = mid;
 	}
 
+	int32_t best = (int32_t)(g_utf8_offset_to_pointer(text, lo) - text);
 	return g_strdup_printf("%.*s…", best, text);
 }
 
@@ -712,6 +720,7 @@ void mango_bar_decoration_destroy(MangoBarDecoration *node) {
 	g_free(node->focus_font_desc);
 	g_free(node->cached_text);
 	g_free(node->cached_font_desc);
+	g_free(node->cached_display);
 	g_free(node->last_text);
 	free(node);
 }
@@ -970,21 +979,28 @@ void mango_bar_decoration_update(MangoBarDecoration *node, const char *text,
 	int32_t avail_w = bar_decoration_avail_width(node);
 	int32_t avail_pixel_w = (int32_t)(avail_w * scale + 0.5f);
 
+	/* Same text, font and scale as last time: its width is known. This runs
+	 * on every frame a window with a group bar animates. */
+	bool same_source =
+		node->cached_scale == scale && node->cached_text &&
+		strcmp(node->cached_text, text) == 0 && node->cached_font_desc &&
+		strcmp(node->cached_font_desc, font_desc) == 0;
 	int32_t natural_pixel_w = 0, natural_pixel_h = 0;
-	measure_text(&node->measure, font_desc, text, scale, &natural_pixel_w,
-				 &natural_pixel_h);
+	if (same_source)
+		natural_pixel_w = node->cached_natural_pixel_w;
+	else
+		measure_text(&node->measure, font_desc, text, scale, &natural_pixel_w,
+					 &natural_pixel_h);
 
 	bool overlong = avail_pixel_w > 0 && natural_pixel_w > avail_pixel_w;
 	int32_t clip_pixel_w = overlong ? avail_pixel_w : 0;
 
-	bool dirty =
-		node->cached_scale != scale || !node->cached_text ||
-		strcmp(node->cached_text, text) != 0 || !node->cached_font_desc ||
-		strcmp(node->cached_font_desc, font_desc) != 0 ||
-		memcmp(node->cached_fg_color, fg_color, sizeof(node->fg_color)) != 0 ||
-		node->cached_focused != node->focused ||
-		node->cached_center_secondary_line != node->center_secondary_line ||
-		node->cached_clip_pixel_w != clip_pixel_w;
+	bool same_style =
+		memcmp(node->cached_fg_color, fg_color, sizeof(node->fg_color)) == 0 &&
+		node->cached_focused == node->focused &&
+		node->cached_center_secondary_line == node->center_secondary_line;
+	bool dirty = !same_source || !same_style ||
+				 node->cached_clip_pixel_w != clip_pixel_w;
 
 	if (dirty) {
 		char *ellipsized = NULL;
@@ -995,6 +1011,20 @@ void mango_bar_decoration_update(MangoBarDecoration *node, const char *text,
 			display = ellipsized;
 		}
 
+		/* Only the room changed (a resize animation) and the title cuts at
+		 * the same place: the texture already shows it. */
+		if (same_source && same_style && node->cached_display &&
+			strcmp(node->cached_display, display) == 0) {
+			node->cached_clip_pixel_w = clip_pixel_w;
+			g_free(ellipsized);
+			bar_decoration_apply_geometry(node);
+			close_button_sync(node);
+			return;
+		}
+
+		g_free(node->cached_display);
+		node->cached_display = g_strdup(display);
+		node->cached_natural_pixel_w = natural_pixel_w;
 		g_free(node->cached_text);
 		node->cached_text = g_strdup(text);
 		g_free(node->cached_font_desc);

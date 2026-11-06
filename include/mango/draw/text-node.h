@@ -109,6 +109,10 @@ typedef struct MangoBarDecoration {
 	bool cached_focused;
 	bool cached_center_secondary_line;
 	int32_t cached_clip_pixel_w;
+	/* The full text's width for cached_text/font_desc/scale, and what was
+	 * rasterized last (the text or its ellipsized form). */
+	int32_t cached_natural_pixel_w;
+	char *cached_display;
 	int32_t surface_pixel_w;
 	int32_t surface_pixel_h;
 
